@@ -63,6 +63,7 @@ services:
         condition: service_completed_successfully
     environment:
       TZ: Asia/Shanghai
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       SERVER_PORT: 8081
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
@@ -74,6 +75,17 @@ services:
       REDIS_PASSWORD:
     ports:
       - "8081:8081"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: hmdp-frontend
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "8080:80"
 
 volumes:
   mysql-data:

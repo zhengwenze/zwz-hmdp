@@ -1,0 +1,9 @@
+.git
+.DS_Store
+target
+frontend/node_modules
+frontend/dist
+frontend/.vite
+frontend/.vite-temp
+frontend/.vscode
+backend/target
