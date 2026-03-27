@@ -1,0 +1,80 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: hmdp-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "001020"
+      MYSQL_DATABASE: hmdp
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./backend/db/hmdp.sql:/docker-entrypoint-initdb.d/01-hmdp.sql:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p001020 --silent" ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: hmdp-redis
+    restart: unless-stopped
+    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
+    volumes:
+      - redis-data:/data
+      - ./backend/docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "redis-cli -a 001020 ping | grep PONG" ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  redis-init:
+    image: redis:7.4-alpine
+    container_name: hmdp-redis-init
+    depends_on:
+      redis:
+        condition: service_healthy
+    command:
+      - /bin/sh
+      - -c
+      - redis-cli -h redis -p 6379 -a 001020 XGROUP CREATE stream.orders g1 $ MKSTREAM || true
+    restart: "no"
+
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hmdp-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      redis-init:
+        condition: service_completed_successfully
+    environment:
+      TZ: Asia/Shanghai
+      SERVER_PORT: 8081
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: hmdp
+      MYSQL_USER: root
+      MYSQL_PASSWORD: "001020"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: "001020"
+    ports:
+      - "8081:8081"
+
+volumes:
+  mysql-data:
+  redis-data:
