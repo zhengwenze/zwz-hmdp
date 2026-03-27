@@ -16,6 +16,7 @@ import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.RegexUtils;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
 import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
 import static com.hmdp.utils.RedisConstants.*;
@@ -47,6 +49,8 @@ import static com.hmdp.utils.SystemConstants.*;
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService {
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+    @Resource
+    private Environment environment;
 
     @Override
     public Result sendCode(String phone, HttpSession session) {
@@ -63,8 +67,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY + phone, code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
         //发送验证码
         log.debug("发送验证码成功，验证码：{}", code);
-        //返回ok
-        return Result.ok();
+        //仅在开发环境回传验证码，方便前端联调自动回填
+        return isDevProfile() ? Result.ok(code) : Result.ok();
     }
 
     @Override
@@ -175,5 +179,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         user.setNickName(USER_NICK_NAME_PREFIX + RandomUtil.randomString(10));
         baseMapper.insert(user);
         return user;
+    }
+
+    private boolean isDevProfile() {
+        return Arrays.stream(environment.getActiveProfiles())
+                .anyMatch(profile -> "dev".equalsIgnoreCase(profile));
     }
 }
