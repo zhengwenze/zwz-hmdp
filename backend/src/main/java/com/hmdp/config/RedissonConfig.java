@@ -23,10 +23,12 @@ public class RedissonConfig {
     private String password;
     @Bean
     public RedissonClient redissonClient(){
-        //配置
         Config config=new Config();
-        config.useSingleServer().setAddress("redis://"+host+":"+port).setPassword(password);
-        //创建对并且返回
+        if (password == null || password.isEmpty()) {
+            config.useSingleServer().setAddress("redis://"+host+":"+port);
+        } else {
+            config.useSingleServer().setAddress("redis://"+host+":"+port).setPassword(password);
+        }
         return Redisson.create(config);
     }
 

@@ -4,7 +4,7 @@ services:
     container_name: hmdp-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: "001020"
+      MYSQL_ROOT_PASSWORD: "root"
       MYSQL_DATABASE: hmdp
       TZ: Asia/Shanghai
     command:
@@ -15,7 +15,7 @@ services:
       - mysql-data:/var/lib/mysql
       - ./backend/db/hmdp.sql:/docker-entrypoint-initdb.d/01-hmdp.sql:ro
     healthcheck:
-      test: [ "CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p001020 --silent" ]
+      test: [ "CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot --silent" ]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -30,7 +30,7 @@ services:
       - redis-data:/data
       - ./backend/docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
     healthcheck:
-      test: [ "CMD-SHELL", "redis-cli -a 001020 ping | grep PONG" ]
+      test: [ "CMD-SHELL", "redis-cli ping | grep PONG" ]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -45,7 +45,7 @@ services:
     command:
       - /bin/sh
       - -c
-      - redis-cli -h redis -p 6379 -a 001020 XGROUP CREATE stream.orders g1 $ MKSTREAM || true
+      - redis-cli -h redis -p 6379 XGROUP CREATE stream.orders g1 $ MKSTREAM || true
     restart: "no"
 
   app:
@@ -68,10 +68,10 @@ services:
       MYSQL_PORT: 3306
       MYSQL_DATABASE: hmdp
       MYSQL_USER: root
-      MYSQL_PASSWORD: "001020"
+      MYSQL_PASSWORD: "root"
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: "001020"
+      REDIS_PASSWORD:
     ports:
       - "8081:8081"
 
