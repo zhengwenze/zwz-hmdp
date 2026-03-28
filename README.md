@@ -42,6 +42,7 @@ hmdp/
 ├── docker-compose.yml               # Docker Compose 编排文件
 └── README.md
 ```
+
 ## 后端接口调用文档
 
 ### 服务信息
@@ -78,12 +79,12 @@ hmdp/
 }
 ```
 
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `success` | `boolean` | 是否成功 |
-| `errorMsg` | `string \| null` | 失败时的错误信息 |
-| `data` | `any` | 真实业务数据 |
-| `total` | `number \| null` | 仅少数分页接口可能使用，本项目大多数接口为 `null` |
+| 字段       | 类型             | 说明                                              |
+| ---------- | ---------------- | ------------------------------------------------- |
+| `success`  | `boolean`        | 是否成功                                          |
+| `errorMsg` | `string \| null` | 失败时的错误信息                                  |
+| `data`     | `any`            | 真实业务数据                                      |
+| `total`    | `number \| null` | 仅少数分页接口可能使用，本项目大多数接口为 `null` |
 
 ### 前端对接注意
 
@@ -98,29 +99,29 @@ hmdp/
 
 > 以下“接口数”按 `HTTP 方法 + 路径` 统计。
 
-| 模块 | 基础路径 | 接口数 | 默认鉴权 |
-| --- | --- | ---: | --- |
-| 用户 | `/user` | 8 | 部分免登录 |
-| 商铺 | `/shop` | 5 | 免登录 |
-| 商铺分类 | `/shop-type` | 1 | 免登录 |
-| 博客 | `/blog` | 8 | 仅 `/blog/hot` 免登录 |
-| 关注 | `/follow` | 3 | 需要登录 |
-| 优惠券 | `/voucher` | 3 | 免登录 |
-| 秒杀下单 | `/voucher-order` | 1 | 需要登录 |
-| 上传 | `/upload` | 2 | 免登录 |
+| 模块     | 基础路径         | 接口数 | 默认鉴权              |
+| -------- | ---------------- | -----: | --------------------- |
+| 用户     | `/user`          |      8 | 部分免登录            |
+| 商铺     | `/shop`          |      5 | 免登录                |
+| 商铺分类 | `/shop-type`     |      1 | 免登录                |
+| 博客     | `/blog`          |      8 | 仅 `/blog/hot` 免登录 |
+| 关注     | `/follow`        |      3 | 需要登录              |
+| 优惠券   | `/voucher`       |      3 | 免登录                |
+| 秒杀下单 | `/voucher-order` |      1 | 需要登录              |
+| 上传     | `/upload`        |      2 | 免登录                |
 
 ### 用户接口 `user`
 
-| 方法 | 路径 | 需要登录 | 主要参数 | 返回 `data` | 说明 |
-| --- | --- | --- | --- | --- | --- |
-| `POST` | `/user/code` | 否 | `Form/Query: phone` | `null` | 发送 6 位验证码，手机号不合法会返回失败 |
-| `POST` | `/user/login` | 否 | `Body: { phone, code, password }` | `string` | 返回 token。当前实现只校验 `phone + code`，`password` 未实际使用 |
-| `POST` | `/user/logout` | 是 | 无 | `null` | 接口已暴露，但当前固定返回失败：`功能未完成` |
-| `GET` | `/user/me` | 是 | 无 | `UserDTO` | 获取当前登录用户 |
-| `GET` | `/user/info/{id}` | 是 | `Path: id` | `UserInfo \| null` | 查询用户详情，不存在时返回 `null` |
-| `GET` | `/user/{id}` | 是 | `Path: id` | `UserDTO \| null` | 查询用户基础信息，不存在时返回 `null` |
-| `POST` | `/user/sign` | 是 | 无 | `null` | 今日签到 |
-| `GET` | `/user/sign/count` | 是s | 无 | `number` | 返回当月截至今天的连续签到天数 |
+| 方法   | 路径               | 需要登录 | 主要参数                          | 返回 `data`        | 说明                                                             |
+| ------ | ------------------ | -------- | --------------------------------- | ------------------ | ---------------------------------------------------------------- |
+| `POST` | `/user/code`       | 否       | `Form/Query: phone`               | `null`             | 发送 6 位验证码，手机号不合法会返回失败                          |
+| `POST` | `/user/login`      | 否       | `Body: { phone, code, password }` | `string`           | 返回 token。当前实现只校验 `phone + code`，`password` 未实际使用 |
+| `POST` | `/user/logout`     | 是       | 无                                | `null`             | 接口已暴露，但当前固定返回失败：`功能未完成`                     |
+| `GET`  | `/user/me`         | 是       | 无                                | `UserDTO`          | 获取当前登录用户                                                 |
+| `GET`  | `/user/info/{id}`  | 是       | `Path: id`                        | `UserInfo \| null` | 查询用户详情，不存在时返回 `null`                                |
+| `GET`  | `/user/{id}`       | 是       | `Path: id`                        | `UserDTO \| null`  | 查询用户基础信息，不存在时返回 `null`                            |
+| `POST` | `/user/sign`       | 是       | 无                                | `null`             | 今日签到                                                         |
+| `GET`  | `/user/sign/count` | 是s      | 无                                | `number`           | 返回当月截至今天的连续签到天数                                   |
 
 #### 登录最小示例
 
@@ -143,13 +144,13 @@ Content-Type: application/json
 
 ### 商铺接口 `shop`
 
-| 方法 | 路径 | 登录 | 主要参数 | 返回 `data` | 说明 |
-| --- | --- | --- | --- | --- | --- |
-| `GET` | `/shop/{id}` | 否 | `Path: id` | `Shop` | 查单个商铺，找不到时返回失败：`店铺不存在` |
-| `POST` | `/shop` | 否 | `Body: Shop` | `null` | 新增商铺。成功后不返回新商铺 ID |
-| `PUT` | `/shop` | 否 | `Body: Shop` | `null` | 更新商铺，`id` 不能为空 |
-| `GET` | `/shop/of/type` | 否 | `Query: typeId, current=1, x?, y?` | `Shop[] \| null` | 不传坐标时普通分页；传 `x/y` 时按 GEO 距离排序并补 `distance` |
-| `GET` | `/shop/of/name` | 否 | `Query: name?, current=1` | `Shop[]` | 按名称模糊搜索 |
+| 方法   | 路径            | 登录 | 主要参数                           | 返回 `data`      | 说明                                                          |
+| ------ | --------------- | ---- | ---------------------------------- | ---------------- | ------------------------------------------------------------- |
+| `GET`  | `/shop/{id}`    | 否   | `Path: id`                         | `Shop`           | 查单个商铺，找不到时返回失败：`店铺不存在`                    |
+| `POST` | `/shop`         | 否   | `Body: Shop`                       | `null`           | 新增商铺。成功后不返回新商铺 ID                               |
+| `PUT`  | `/shop`         | 否   | `Body: Shop`                       | `null`           | 更新商铺，`id` 不能为空                                       |
+| `GET`  | `/shop/of/type` | 否   | `Query: typeId, current=1, x?, y?` | `Shop[] \| null` | 不传坐标时普通分页；传 `x/y` 时按 GEO 距离排序并补 `distance` |
+| `GET`  | `/shop/of/name` | 否   | `Query: name?, current=1`          | `Shop[]`         | 按名称模糊搜索                                                |
 
 #### 商铺按类型查询最小示例
 
@@ -173,22 +174,22 @@ GET /shop/of/type?typeId=1&current=1&x=120.149192&y=30.316078
 
 ### 商铺分类接口 `shop-type`
 
-| 方法 | 路径 | 登录 | 主要参数 | 返回 `data` | 说明 |
-| --- | --- | --- | --- | --- | --- |
-| `GET` | `/shop-type/list` | 否 | 无 | `ShopType[]` | 按 `sort` 升序返回 |
+| 方法  | 路径              | 登录 | 主要参数 | 返回 `data`  | 说明               |
+| ----- | ----------------- | ---- | -------- | ------------ | ------------------ |
+| `GET` | `/shop-type/list` | 否   | 无       | `ShopType[]` | 按 `sort` 升序返回 |
 
 ### 博客接口 `blog`
 
-| 方法 | 路径 | 登录 | 主要参数 | 返回 `data` | 说明 |
-| --- | --- | --- | --- | --- | --- |
-| `POST` | `/blog` | 是 | `Body: Blog` | `number` | 发布探店笔记，返回博客 ID |
-| `PUT` | `/blog/like/{id}` | 是 | `Path: id` | `null` | 点赞/取消点赞，同一路径切换状态 |
-| `GET` | `/blog/of/me` | 是 | `Query: current=1` | `Blog[]` | 当前登录用户的笔记 |
-| `GET` | `/blog/hot` | 否 | `Query: current=1` | `Blog[]` | 热门笔记。若携带 token，会补充 `isLike` |
-| `GET` | `/blog/{id}` | 是 | `Path: id` | `Blog` | 查询笔记详情，不存在时返回失败：`博客不存在` |
-| `GET` | `/blog/likes/{id}` | 是 | `Path: id` | `UserDTO[]` | 点赞用户列表，当前实现最多返回 7 条 |
-| `GET` | `/blog/of/user` | 是 | `Query: id, current=1` | `Blog[]` | 查看某个用户的笔记 |
-| `GET` | `/blog/of/follow` | 是 | `Query: lastId, offset=0` | `ScrollResult \| null` | 关注推送流，当前每次最多拉取 2 条 |
+| 方法   | 路径               | 登录 | 主要参数                  | 返回 `data`            | 说明                                         |
+| ------ | ------------------ | ---- | ------------------------- | ---------------------- | -------------------------------------------- |
+| `POST` | `/blog`            | 是   | `Body: Blog`              | `number`               | 发布探店笔记，返回博客 ID                    |
+| `PUT`  | `/blog/like/{id}`  | 是   | `Path: id`                | `null`                 | 点赞/取消点赞，同一路径切换状态              |
+| `GET`  | `/blog/of/me`      | 是   | `Query: current=1`        | `Blog[]`               | 当前登录用户的笔记                           |
+| `GET`  | `/blog/hot`        | 否   | `Query: current=1`        | `Blog[]`               | 热门笔记。若携带 token，会补充 `isLike`      |
+| `GET`  | `/blog/{id}`       | 是   | `Path: id`                | `Blog`                 | 查询笔记详情，不存在时返回失败：`博客不存在` |
+| `GET`  | `/blog/likes/{id}` | 是   | `Path: id`                | `UserDTO[]`            | 点赞用户列表，当前实现最多返回 7 条          |
+| `GET`  | `/blog/of/user`    | 是   | `Query: id, current=1`    | `Blog[]`               | 查看某个用户的笔记                           |
+| `GET`  | `/blog/of/follow`  | 是   | `Query: lastId, offset=0` | `ScrollResult \| null` | 关注推送流，当前每次最多拉取 2 条            |
 
 #### 发布博客最小示例
 
@@ -237,25 +238,25 @@ authorization: <token>
 
 ### 关注接口 `follow`
 
-| 方法 | 路径 | 登录 | 主要参数 | 返回 `data` | 说明 |
-| --- | --- | --- | --- | --- | --- |
-| `PUT` | `/follow/{id}/{isFollow}` | 是 | `Path: id, isFollow` | `null` | `isFollow=true` 表示关注，`false` 表示取关 |
-| `GET` | `/follow/or/not/{id}` | 是 | `Path: id` | `boolean` | 是否已关注该用户 |
-| `GET` | `/follow/common/{id}` | 是 | `Path: id` | `UserDTO[]` | 共同关注列表，空时返回 `[]` |
+| 方法  | 路径                      | 登录 | 主要参数             | 返回 `data` | 说明                                       |
+| ----- | ------------------------- | ---- | -------------------- | ----------- | ------------------------------------------ |
+| `PUT` | `/follow/{id}/{isFollow}` | 是   | `Path: id, isFollow` | `null`      | `isFollow=true` 表示关注，`false` 表示取关 |
+| `GET` | `/follow/or/not/{id}`     | 是   | `Path: id`           | `boolean`   | 是否已关注该用户                           |
+| `GET` | `/follow/common/{id}`     | 是   | `Path: id`           | `UserDTO[]` | 共同关注列表，空时返回 `[]`                |
 
 ### 优惠券接口 `voucher`
 
-| 方法 | 路径 | 登录 | 主要参数 | 返回 `data` | 说明 |
-| --- | --- | --- | --- | --- | --- |
-| `POST` | `/voucher` | 否 | `Body: Voucher` | `number` | 新增普通券，返回券 ID |
-| `POST` | `/voucher/seckill` | 否 | `Body: Voucher` | `number` | 新增秒杀券，返回券 ID，需同时传 `stock / beginTime / endTime` |
-| `GET` | `/voucher/list/{shopId}` | 否 | `Path: shopId` | `Voucher[]` | 查询店铺可用券列表；秒杀券会混合返回 `stock / beginTime / endTime` |
+| 方法   | 路径                     | 登录 | 主要参数        | 返回 `data` | 说明                                                               |
+| ------ | ------------------------ | ---- | --------------- | ----------- | ------------------------------------------------------------------ |
+| `POST` | `/voucher`               | 否   | `Body: Voucher` | `number`    | 新增普通券，返回券 ID                                              |
+| `POST` | `/voucher/seckill`       | 否   | `Body: Voucher` | `number`    | 新增秒杀券，返回券 ID，需同时传 `stock / beginTime / endTime`      |
+| `GET`  | `/voucher/list/{shopId}` | 否   | `Path: shopId`  | `Voucher[]` | 查询店铺可用券列表；秒杀券会混合返回 `stock / beginTime / endTime` |
 
 ### 秒杀下单接口 `voucher-order`
 
-| 方法 | 路径 | 登录 | 主要参数 | 返回 `data` | 说明 |
-| --- | --- | --- | --- | --- | --- |
-| `POST` | `/voucher-order/seckill/{id}` | 是 | `Path: id` | `number` | 发起秒杀下单，成功返回订单 ID；失败常见文案：`库存不足`、`禁止重复下单` |
+| 方法   | 路径                          | 登录 | 主要参数   | 返回 `data` | 说明                                                                    |
+| ------ | ----------------------------- | ---- | ---------- | ----------- | ----------------------------------------------------------------------- |
+| `POST` | `/voucher-order/seckill/{id}` | 是   | `Path: id` | `number`    | 发起秒杀下单，成功返回订单 ID；失败常见文案：`库存不足`、`禁止重复下单` |
 
 #### 秒杀下单最小示例
 
@@ -273,10 +274,10 @@ authorization: <token>
 
 ### 上传接口 `upload`
 
-| 方法 | 路径 | 登录 | 主要参数 | 返回 `data` | 说明 |
-| --- | --- | --- | --- | --- | --- |
-| `POST` | `/upload/blog` | 否 | `FormData: file` | `string` | 上传博客图片，返回文件相对路径，如 `/blogs/1/2/uuid.png` |
-| `GET` | `/upload/blog/delete` | 否 | `Query: name` | `null` | 删除博客图片，`name` 必须是返回的文件名/相对路径 |
+| 方法   | 路径                  | 登录 | 主要参数         | 返回 `data` | 说明                                                     |
+| ------ | --------------------- | ---- | ---------------- | ----------- | -------------------------------------------------------- |
+| `POST` | `/upload/blog`        | 否   | `FormData: file` | `string`    | 上传博客图片，返回文件相对路径，如 `/blogs/1/2/uuid.png` |
+| `GET`  | `/upload/blog/delete` | 否   | `Query: name`    | `null`      | 删除博客图片，`name` 必须是返回的文件名/相对路径         |
 
 #### 图片上传最小示例
 
