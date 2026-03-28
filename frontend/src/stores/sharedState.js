@@ -1,6 +1,5 @@
 import { reactive, ref, watch } from "vue";
 import {
-  asBoolean,
   asNumber,
   cloneWithoutEmpty,
   createApiClient,
@@ -27,8 +26,6 @@ export const sharedState = {
   uploadedImages: ref(
     JSON.parse(localStorage.getItem("hmdp-uploaded-images") || "[]"),
   ),
-  selectedUploadFile: ref(null),
-  lastDevCode: ref(""),
 
   notice: reactive({
     type: "info",
@@ -39,22 +36,7 @@ export const sharedState = {
   loadingMap: reactive({}),
 
   shopTypes: ref([]),
-  shopsByType: ref([]),
-  shopsByName: ref([]),
   selectedShop: ref(null),
-  vouchers: ref([]),
-  hotBlogs: ref([]),
-  myBlogs: ref([]),
-  userBlogs: ref([]),
-  blogDetail: ref(null),
-  blogLikes: ref([]),
-  followFeed: ref(null),
-  userDetail: ref(null),
-  userSummary: ref(null),
-  followStatus: ref(null),
-  commonFollows: ref([]),
-  signCount: ref(null),
-  seckillOrderId: ref(null),
 };
 
 const apiClient = createApiClient({

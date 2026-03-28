@@ -1,7 +1,6 @@
 <script setup>
-import { reactive } from "vue";
+import { reactive, ref } from "vue";
 import {
-  sharedState,
   send,
   isLoading,
   endpointBadgeClass,
@@ -35,6 +34,8 @@ const forms = reactive({
     seckillId: "1",
   },
 });
+const vouchers = ref([]);
+const seckillOrderId = ref(null);
 
 async function createNormalVoucher() {
   await send(
@@ -60,7 +61,7 @@ async function fetchVoucherList(shopId = forms.voucher.shopId) {
     {
       successMessage: "优惠券列表已更新。",
       onSuccess: (data) => {
-        sharedState.vouchers.value = Array.isArray(data) ? data : [];
+        vouchers.value = Array.isArray(data) ? data : [];
       },
     },
   );
@@ -74,7 +75,7 @@ async function seckillVoucher(voucherId = forms.voucher.seckillId) {
     {
       successMessage: "秒杀下单请求已发送。",
       onSuccess: (data) => {
-        sharedState.seckillOrderId.value = data ?? null;
+        seckillOrderId.value = data ?? null;
       },
     },
   );
@@ -104,7 +105,7 @@ async function seckillVoucher(voucherId = forms.voucher.seckillId) {
           <button :disabled="isLoading('GET /voucher/list/{shopId}')" @click="fetchVoucherList()">查询店铺券</button>
         </div>
         <div class="voucher-grid">
-          <article v-for="voucher in sharedState.vouchers.value" :key="voucher.id" class="voucher-card">
+          <article v-for="voucher in vouchers" :key="voucher.id" class="voucher-card">
             <div class="blog-card-head">
               <strong>{{ voucher.title }}</strong>
               <span class="ue-stamp">{{ voucher.type === 1 ? "秒杀券" : "普通券" }}</span>
@@ -161,7 +162,7 @@ async function seckillVoucher(voucherId = forms.voucher.seckillId) {
         <div class="inline-stats">
           <div>
             <span class="label">最近秒杀订单 ID</span>
-            <strong>{{ sharedState.seckillOrderId.value ?? "--" }}</strong>
+            <strong>{{ seckillOrderId ?? "--" }}</strong>
           </div>
         </div>
       </article>

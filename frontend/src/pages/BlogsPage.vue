@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, computed } from "vue";
+import { reactive, computed, ref } from "vue";
 import {
   sharedState,
   send,
@@ -35,7 +35,12 @@ const forms = reactive({
     commonUserId: "1",
   },
 });
-
+const hotBlogs = ref([]);
+const myBlogs = ref([]);
+const blogDetail = ref(null);
+const blogLikes = ref([]);
+const userBlogs = ref([]);
+const followFeed = ref(null);
 const blogImageList = computed(() => splitImages(forms.blog.create.images));
 
 async function createBlog() {
@@ -61,7 +66,7 @@ async function fetchHotBlogs() {
     {
       successMessage: "热门博客已刷新。",
       onSuccess: (data) => {
-        sharedState.hotBlogs.value = Array.isArray(data) ? data : [];
+        hotBlogs.value = Array.isArray(data) ? data : [];
       },
     },
   );
@@ -74,7 +79,7 @@ async function fetchMyBlogs() {
     {
       successMessage: "我的博客列表已刷新。",
       onSuccess: (data) => {
-        sharedState.myBlogs.value = Array.isArray(data) ? data : [];
+        myBlogs.value = Array.isArray(data) ? data : [];
       },
     },
   );
@@ -88,7 +93,7 @@ async function fetchBlogDetail(blogId = forms.blog.detailId) {
     {
       successMessage: "博客详情已更新。",
       onSuccess: (data) => {
-        sharedState.blogDetail.value = data || null;
+        blogDetail.value = data || null;
       },
     },
   );
@@ -102,7 +107,7 @@ async function fetchBlogLikes(blogId = forms.blog.likesId) {
     {
       successMessage: "点赞用户列表已更新。",
       onSuccess: (data) => {
-        sharedState.blogLikes.value = Array.isArray(data) ? data : [];
+        blogLikes.value = Array.isArray(data) ? data : [];
       },
     },
   );
@@ -128,7 +133,7 @@ async function fetchUserBlogs() {
     {
       successMessage: "指定用户博客列表已更新。",
       onSuccess: (data) => {
-        sharedState.userBlogs.value = Array.isArray(data) ? data : [];
+        userBlogs.value = Array.isArray(data) ? data : [];
       },
     },
   );
@@ -141,7 +146,7 @@ async function fetchFollowFeed() {
     {
       successMessage: "关注推送流已更新。",
       onSuccess: (data) => {
-        sharedState.followFeed.value = data || null;
+        followFeed.value = data || null;
         if (data?.minTime) {
           forms.blog.followLastId = String(data.minTime);
         }
@@ -211,7 +216,7 @@ function fillFollowTarget(userId) {
           <button :disabled="isLoading('GET /blog/hot')" @click="fetchHotBlogs">刷新热门博客</button>
         </div>
         <div class="blog-grid">
-          <article v-for="blog in sharedState.hotBlogs.value" :key="`hot-${blog.id}`" class="blog-card">
+          <article v-for="blog in hotBlogs" :key="`hot-${blog.id}`" class="blog-card">
             <div class="blog-card-head">
               <strong>{{ blog.title }}</strong>
               <span class="ue-stamp">赞 {{ blog.liked }}</span>
@@ -242,7 +247,7 @@ function fillFollowTarget(userId) {
           <button :disabled="isLoading('GET /blog/of/me')" @click="fetchMyBlogs">查询我的博客</button>
         </div>
         <div class="simple-list">
-          <div v-for="blog in sharedState.myBlogs.value" :key="`my-${blog.id}`" class="simple-row">
+          <div v-for="blog in myBlogs" :key="`my-${blog.id}`" class="simple-row">
             <span>#{{ blog.id }} {{ blog.title }}</span>
             <div class="button-row tight">
               <button class="secondary" @click="fillBlogDetail(blog)">详情</button>
@@ -266,8 +271,8 @@ function fillFollowTarget(userId) {
           <button :disabled="isLoading('GET /blog/likes/{id}')" @click="fetchBlogLikes()">查询点赞列表</button>
           <button :disabled="isLoading('PUT /blog/like/{id}')" @click="toggleBlogLike(forms.blog.detailId)">切换点赞</button>
         </div>
-        <pre class="json-box">{{ JSON.stringify(sharedState.blogDetail.value || { message: "尚未查询博客详情" }, null, 2) }}</pre>
-        <pre class="json-box small">{{ JSON.stringify(sharedState.blogLikes.value, null, 2) }}</pre>
+        <pre class="json-box">{{ JSON.stringify(blogDetail || { message: "尚未查询博客详情" }, null, 2) }}</pre>
+        <pre class="json-box small">{{ JSON.stringify(blogLikes, null, 2) }}</pre>
       </article>
 
       <article class="panel ue-washi ue-shadow ukiyo-e-digital-card">
@@ -283,7 +288,7 @@ function fillFollowTarget(userId) {
           <button :disabled="isLoading('GET /blog/of/user')" @click="fetchUserBlogs">查询指定用户博客</button>
         </div>
         <div class="simple-list">
-          <div v-for="blog in sharedState.userBlogs.value" :key="`user-${blog.id}`" class="simple-row">
+          <div v-for="blog in userBlogs" :key="`user-${blog.id}`" class="simple-row">
             <span>#{{ blog.id }} {{ blog.title }}</span>
             <div class="button-row tight">
               <button class="secondary" @click="fillBlogDetail(blog)">详情</button>
@@ -305,7 +310,7 @@ function fillFollowTarget(userId) {
         <div class="button-row">
           <button :disabled="isLoading('GET /blog/of/follow')" @click="fetchFollowFeed">拉取关注流</button>
         </div>
-        <pre class="json-box">{{ JSON.stringify(sharedState.followFeed.value || { message: "尚未拉取关注流" }, null, 2) }}</pre>
+        <pre class="json-box">{{ JSON.stringify(followFeed || { message: "尚未拉取关注流" }, null, 2) }}</pre>
       </article>
     </div>
   </section>

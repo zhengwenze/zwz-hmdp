@@ -1,5 +1,5 @@
 <script setup>
-import { reactive } from "vue";
+import { reactive, ref } from "vue";
 import {
   sharedState,
   send,
@@ -15,6 +15,8 @@ const forms = reactive({
     commonUserId: "1",
   },
 });
+const followStatus = ref(null);
+const commonFollows = ref([]);
 
 async function updateFollowState(value) {
   const boolValue = asBoolean(value);
@@ -32,7 +34,7 @@ async function checkFollowStatus() {
     {
       successMessage: "关注状态已更新。",
       onSuccess: (data) => {
-        sharedState.followStatus.value = data;
+        followStatus.value = data;
       },
     },
   );
@@ -45,7 +47,7 @@ async function fetchCommonFollows() {
     {
       successMessage: "共同关注列表已更新。",
       onSuccess: (data) => {
-        sharedState.commonFollows.value = Array.isArray(data) ? data : [];
+        commonFollows.value = Array.isArray(data) ? data : [];
       },
     },
   );
@@ -92,9 +94,9 @@ async function fetchCommonFollows() {
           <div>
             <span class="label">结果</span>
             <strong>{{
-              sharedState.followStatus.value === null
+              followStatus === null
                 ? "--"
-                : sharedState.followStatus.value
+                : followStatus
                   ? "已关注"
                   : "未关注"
             }}</strong>
@@ -113,7 +115,7 @@ async function fetchCommonFollows() {
         <div class="button-row">
           <button :disabled="isLoading('GET /follow/common/{id}')" @click="fetchCommonFollows">查询共同关注</button>
         </div>
-        <pre class="json-box small">{{ JSON.stringify(sharedState.commonFollows.value, null, 2) }}</pre>
+        <pre class="json-box small">{{ JSON.stringify(commonFollows, null, 2) }}</pre>
       </article>
     </div>
   </section>

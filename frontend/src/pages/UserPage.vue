@@ -1,12 +1,12 @@
 <script setup>
-import { reactive } from "vue";
+import { reactive, ref } from "vue";
 import {
   sharedState,
   send,
   isLoading,
-  markTouched,
   endpointBadgeClass,
   prettify,
+  setNotice,
 } from "../stores/sharedState";
 import { cloneWithoutEmpty } from "../api";
 
@@ -19,6 +19,10 @@ const forms = reactive({
     profileId: "1",
   },
 });
+const lastDevCode = ref("");
+const userDetail = ref(null);
+const userSummary = ref(null);
+const signCount = ref(null);
 
 async function fetchMe() {
   return send(
@@ -46,12 +50,11 @@ async function sendCode() {
       onSuccess: (data) => {
         if (typeof data === "string" && data) {
           forms.user.code = String(data);
-          sharedState.lastDevCode.value = data;
-          sharedState.notice.type = "success";
-          sharedState.notice.message = `验证码已自动回填到表单：${data}`;
+          lastDevCode.value = data;
+          setNotice("success", `验证码已自动回填到表单：${data}`);
         } else {
-          sharedState.lastDevCode.value = "";
-          sharedState.notice.message = "验证码请求已发送。当前环境未开启自动回填，请查看短信或后端日志。";
+          lastDevCode.value = "";
+          setNotice("success", "验证码请求已发送。当前环境未开启自动回填，请查看短信或后端日志。");
         }
       },
     },
@@ -92,8 +95,7 @@ async function logout() {
 function clearLocalToken() {
   sharedState.token.value = "";
   sharedState.currentUser.value = null;
-  sharedState.notice.type = "info";
-  sharedState.notice.message = "本地 token 已清空。后端 logout 接口仍保留单独按钮供你验证。";
+  setNotice("info", "本地 token 已清空。后端 logout 接口仍保留单独按钮供你验证。");
 }
 
 async function fetchUserInfo() {
@@ -103,7 +105,7 @@ async function fetchUserInfo() {
     {
       successMessage: "用户详情已更新。",
       onSuccess: (data) => {
-        sharedState.userDetail.value = data || null;
+        userDetail.value = data || null;
       },
     },
   );
@@ -116,7 +118,7 @@ async function fetchUserSummary() {
     {
       successMessage: "用户基础信息已更新。",
       onSuccess: (data) => {
-        sharedState.userSummary.value = data || null;
+        userSummary.value = data || null;
       },
     },
   );
@@ -137,7 +139,7 @@ async function fetchSignCount() {
     {
       successMessage: "已查询连续签到天数。",
       onSuccess: (data) => {
-        sharedState.signCount.value = data ?? null;
+        signCount.value = data ?? null;
       },
     },
   );
@@ -169,8 +171,8 @@ async function fetchSignCount() {
             <span>验证码</span>
             <input v-model="forms.user.code" placeholder="后端日志中的 6 位验证码" />
           </label>
-          <p v-if="sharedState.lastDevCode.value" class="helper dev-code">
-            开发环境验证码已回填：{{ sharedState.lastDevCode.value }}
+          <p v-if="lastDevCode" class="helper dev-code">
+            开发环境验证码已回填：{{ lastDevCode }}
           </p>
           <label>
             <span>密码</span>
@@ -203,7 +205,7 @@ async function fetchSignCount() {
           </div>
           <div>
             <span class="label">连续签到</span>
-            <strong>{{ sharedState.signCount.value ?? "--" }}</strong>
+            <strong>{{ signCount ?? "--" }}</strong>
           </div>
         </div>
         <p class="helper">`/user/logout` 当前由后端固定返回"功能未完成"，保留该按钮用于接口验证。</p>
@@ -223,7 +225,7 @@ async function fetchSignCount() {
         <div class="button-row">
           <button :disabled="isLoading('GET /user/info/{id}')" @click="fetchUserInfo">查询详情</button>
         </div>
-        <pre class="json-box">{{ prettify(sharedState.userDetail.value || { message: "尚未查询" }) }}</pre>
+        <pre class="json-box">{{ prettify(userDetail || { message: "尚未查询" }) }}</pre>
       </article>
 
       <article class="panel ue-washi ue-shadow ukiyo-e-digital-card">
@@ -240,7 +242,7 @@ async function fetchSignCount() {
         <div class="button-row">
           <button :disabled="isLoading('GET /user/{id}')" @click="fetchUserSummary">查询基础信息</button>
         </div>
-        <pre class="json-box">{{ prettify(sharedState.userSummary.value || { message: "尚未查询" }) }}</pre>
+        <pre class="json-box">{{ prettify(userSummary || { message: "尚未查询" }) }}</pre>
       </article>
     </div>
   </section>

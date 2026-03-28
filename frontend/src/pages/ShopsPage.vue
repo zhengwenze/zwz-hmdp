@@ -1,5 +1,5 @@
 <script setup>
-import { reactive } from "vue";
+import { reactive, ref } from "vue";
 import {
   sharedState,
   send,
@@ -50,6 +50,8 @@ const forms = reactive({
     },
   },
 });
+const shopsByType = ref([]);
+const shopsByName = ref([]);
 
 async function queryShopsByType() {
   await send(
@@ -67,7 +69,7 @@ async function queryShopsByType() {
     {
       successMessage: "分类商铺列表已更新。",
       onSuccess: (data) => {
-        sharedState.shopsByType.value = Array.isArray(data) ? data : [];
+        shopsByType.value = Array.isArray(data) ? data : [];
       },
     },
   );
@@ -87,7 +89,7 @@ async function queryShopsByName() {
     {
       successMessage: "名称搜索结果已更新。",
       onSuccess: (data) => {
-        sharedState.shopsByName.value = Array.isArray(data) ? data : [];
+        shopsByName.value = Array.isArray(data) ? data : [];
       },
     },
   );
@@ -157,7 +159,7 @@ async function updateShop() {
           <button :disabled="isLoading('GET /shop/of/type')" @click="queryShopsByType">查询分类商铺</button>
         </div>
         <div class="shop-grid">
-          <article v-for="shop in sharedState.shopsByType.value" :key="`type-${shop.id}`" class="shop-card">
+          <article v-for="shop in shopsByType" :key="`type-${shop.id}`" class="shop-card">
             <img v-if="splitImages(shop.images)[0]" :src="toAssetUrl(splitImages(shop.images)[0])" :alt="shop.name" />
             <div>
               <strong>{{ shop.name }}</strong>
@@ -184,7 +186,7 @@ async function updateShop() {
           <button :disabled="isLoading('GET /shop/of/name')" @click="queryShopsByName">搜索商铺</button>
         </div>
         <div class="shop-grid">
-          <article v-for="shop in sharedState.shopsByName.value" :key="`name-${shop.id}`" class="shop-card">
+          <article v-for="shop in shopsByName" :key="`name-${shop.id}`" class="shop-card">
             <img v-if="splitImages(shop.images)[0]" :src="toAssetUrl(splitImages(shop.images)[0])" :alt="shop.name" />
             <div>
               <strong>{{ shop.name }}</strong>

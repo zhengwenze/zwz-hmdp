@@ -1,26 +1,29 @@
 <script setup>
+import { ref } from "vue";
 import {
   sharedState,
   send,
   isLoading,
   endpointBadgeClass,
   toAssetUrl,
+  setNotice,
 } from "../stores/sharedState";
+
+const selectedUploadFile = ref(null);
 
 function onUploadFileChange(event) {
   const [file] = event.target.files || [];
-  sharedState.selectedUploadFile.value = file || null;
+  selectedUploadFile.value = file || null;
 }
 
 async function uploadBlogImage() {
-  if (!sharedState.selectedUploadFile.value) {
-    sharedState.notice.type = "error";
-    sharedState.notice.message = "请先选择一个图片文件。";
+  if (!selectedUploadFile.value) {
+    setNotice("error", "请先选择一个图片文件。");
     return;
   }
 
   const formData = new FormData();
-  formData.append("file", sharedState.selectedUploadFile.value);
+  formData.append("file", selectedUploadFile.value);
 
   await send(
     "POST /upload/blog",

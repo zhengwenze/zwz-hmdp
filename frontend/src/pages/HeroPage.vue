@@ -1,5 +1,7 @@
 <script setup>
 import { computed, onMounted } from "vue";
+import { RouterLink } from "vue-router";
+import { moduleMeta } from "../config/moduleMeta";
 import { sharedState, send } from "../stores/sharedState";
 
 const effectiveApiBase = computed(
@@ -18,35 +20,24 @@ const shortToken = computed(() => {
   }
   return `${sharedState.token.value.slice(0, 8)}...${sharedState.token.value.slice(-6)}`;
 });
+const moduleLinks = computed(() => moduleMeta.filter((item) => item.id !== "hero"));
 
 onMounted(async () => {
-  await send(
-    "GET /shop-type/list",
-    {
-      method: "GET",
-      path: "/shop-type/list",
-    },
-    {
-      successMessage: "分类列表已刷新。",
-      onSuccess: (data) => {
-        sharedState.shopTypes.value = Array.isArray(data) ? data : [];
+  if (!sharedState.shopTypes.value.length) {
+    await send(
+      "GET /shop-type/list",
+      {
+        method: "GET",
+        path: "/shop-type/list",
       },
-    },
-  );
-  await send(
-    "GET /blog/hot",
-    {
-      method: "GET",
-      path: "/blog/hot",
-      query: { current: "1" },
-    },
-    {
-      successMessage: "热门博客已刷新。",
-      onSuccess: (data) => {
-        sharedState.hotBlogs.value = Array.isArray(data) ? data : [];
+      {
+        successMessage: "分类列表已刷新。",
+        onSuccess: (data) => {
+          sharedState.shopTypes.value = Array.isArray(data) ? data : [];
+        },
       },
-    },
-  );
+    );
+  }
   if (sharedState.token.value) {
     await send(
       "GET /user/me",
@@ -102,16 +93,44 @@ onMounted(async () => {
         <strong>{{ sharedState.currentUser.value?.nickName || "匿名访客" }}</strong>
         <small>ID：{{ sharedState.currentUser.value?.id ?? "--" }}</small>
       </div>
+      <div class="info-card ukiyo-e-digital-card">
+        <span class="label">分类缓存</span>
+        <strong>{{ sharedState.shopTypes.value.length }}</strong>
+        <small>供商铺和博客模块复用</small>
+      </div>
+      <div class="info-card ukiyo-e-digital-card">
+        <span class="label">请求日志</span>
+        <strong>{{ sharedState.requestLogs.value.length }}</strong>
+        <small>最近 40 次调用都会保留在诊断页</small>
+      </div>
+      <div class="info-card ukiyo-e-digital-card">
+        <span class="label">最近响应</span>
+        <strong>{{ sharedState.lastResponse.value?.status ?? "--" }}</strong>
+        <small>{{ sharedState.lastResponse.value?.endpointKey || "尚无请求" }}</small>
+      </div>
+      <div class="info-card ukiyo-e-digital-card">
+        <span class="label">上传缓存</span>
+        <strong>{{ sharedState.uploadedImages.value.length }}</strong>
+        <small>最近上传的博客图片会保存在本地</small>
+      </div>
     </div>
-    <div class="notice-bar" :class="sharedState.notice.type">
-      <span class="ue-stamp">{{
-        sharedState.notice.type === "error"
-          ? "警示"
-          : sharedState.notice.type === "success"
-            ? "已响应"
-            : "提示"
-      }}</span>
-      <span>{{ sharedState.notice.message }}</span>
-    </div>
+
+    <article class="panel ue-washi ue-shadow ukiyo-e-digital-card">
+      <div class="panel-head">
+        <h3>模块入口</h3>
+        <span class="status-pill muted">按模块拆页</span>
+      </div>
+      <div class="module-link-grid">
+        <RouterLink
+          v-for="item in moduleLinks"
+          :key="item.id"
+          :to="item.path"
+          class="module-link-card"
+        >
+          <strong>{{ item.label }}</strong>
+          <p>{{ item.description }}</p>
+        </RouterLink>
+      </div>
+    </article>
   </section>
 </template>
