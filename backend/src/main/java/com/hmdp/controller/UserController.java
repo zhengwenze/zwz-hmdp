@@ -11,7 +11,6 @@ import com.hmdp.service.IUserService;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
-
 import javax.annotation.Resource;
 import javax.servlet.http.HttpSession;
 
@@ -99,7 +98,7 @@ public class UserController {
 
     @PutMapping("/nickname")
     public Result updateNickName(@RequestParam("nickName") String nickName,
-                                  @RequestHeader(value = "authorization", required = false) String token) {
+            @RequestHeader(value = "authorization", required = false) String token) {
         return userService.updateNickName(nickName, token);
     }
 }

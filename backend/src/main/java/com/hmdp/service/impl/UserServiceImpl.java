@@ -192,13 +192,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             return Result.fail("用户未登录");
         }
 
-        User user = baseMapper.selectById(userId);
-        if (user == null) {
+        int rows = baseMapper.update(null, new LambdaQueryWrapper<User>()
+                .eq(User::getId, userId)
+                .set(User::getNickName, nickName));
+
+        if (rows == 0) {
             return Result.fail("用户不存在");
         }
-
-        user.setNickName(nickName);
-        baseMapper.updateById(user);
 
         if (token != null && !token.isEmpty()) {
             String tokenKey = LOGIN_USER_KEY + token;

@@ -1,48 +1,10 @@
-Spring Boot# 高并发电商秒杀平台
+# 高并发电商秒杀平台
 
 **后端技术栈：** Java、、Spring Data Redis、MyBatis Plus、Redisson、MySQL、Redis、Redis Stream、Lombok、Hutool
 
 **前端技术栈：** Vue 3、Vue Router、Pinia State、Vite、Axios
 
 **基础设施：** Docker、Docker Compose、Maven
-
-## 前端工程结构
-
-```
-frontend/
-├── src/
-│   ├── api.js                      # Axios 封装、请求/响应拦截器
-│   ├── main.js                     # Vue 应用入口
-│   ├── App.vue                     # 根组件
-│   ├── style.css                   # 全局样式
-│   ├── config/
-│   │   ├── moduleMeta.js           # 模块元数据（路由、标题、描述）
-│   │   └── endpointCatalog.js      # 接口目录与参数定义
-│   ├── stores/
-│   │   └── sharedState.js         # 全局状态（Pinia-like 响应式状态）
-│   ├── layout/
-│   │   └── AppShell.vue           # 布局壳（侧边栏 + 内容区）
-│   ├── pages/                     # 页面组件（按业务模块拆分）
-│   │   ├── HeroPage.vue           # 首页/总览
-│   │   ├── UserPage.vue           # 用户模块
-│   │   ├── ShopTypesPage.vue      # 商铺分类
-│   │   ├── ShopsPage.vue          # 商铺管理
-│   │   ├── BlogsPage.vue          # 博客/探店笔记
-│   │   ├── FollowPage.vue         # 关注关系
-│   │   ├── VouchersPage.vue       # 优惠券与秒杀
-│   │   ├── UploadPage.vue         # 图片上传
-│   │   └── LogsPage.vue           # 接口诊断日志
-│   ├── components/
-│   │   └── SidebarNav.vue         # 侧边导航组件
-│   └── router/
-│       └── index.js               # Vue Router 配置
-├── public/                         # 静态资源
-├── index.html                     # HTML 入口
-├── vite.config.js                 # Vite 构建配置
-└── package.json                   # 依赖管理
-```
-
----
 
 ## 前端架构设计
 
