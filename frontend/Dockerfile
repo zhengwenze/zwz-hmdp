@@ -4,7 +4,6 @@ COPY frontend/package.json ./package.json
 COPY frontend/yarn.lock ./yarn.lock
 RUN yarn install --frozen-lockfile
 COPY frontend ./
-COPY ukiyo-e-digital-style-pack ../ukiyo-e-digital-style-pack
 RUN yarn build
 
 FROM nginx:alpine
