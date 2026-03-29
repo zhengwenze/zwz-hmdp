@@ -1,8 +1,23 @@
 <script setup>
-import { RouterView } from "vue-router";
+import { computed } from "vue";
+import { RouterLink, RouterView, useRoute } from "vue-router";
 import SidebarNav from "../components/SidebarNav.vue";
 import { sidebarModules } from "../config/moduleMeta";
 import { sharedState } from "../stores/sharedState";
+
+const route = useRoute();
+
+const authStatus = computed(() =>
+  sharedState.currentUser.value?.nickName
+    || (sharedState.token.value.trim() ? "本地 token 已保存" : "未登录"),
+);
+
+const authRoute = computed(() => ({
+  path: "/auth",
+  query: {
+    redirect: route.fullPath || "/",
+  },
+}));
 </script>
 
 <template>
@@ -10,7 +25,10 @@ import { sharedState } from "../stores/sharedState";
     <aside class="sidebar ue-shadow ue-washi">
       <div class="sidebar-head">
         <div class="ue-stamp">菜单</div>
-        <p>登录 / 注册</p>
+        <RouterLink :to="authRoute" class="sidebar-auth-link">
+          <span>{{ authStatus }}</span>
+          <small>验证码登录</small>
+        </RouterLink>
       </div>
       <SidebarNav :items="sidebarModules" />
     </aside>

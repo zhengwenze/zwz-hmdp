@@ -97,6 +97,32 @@ button:disabled {
   opacity: 0.65;
 }
 
+.link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 46px;
+  padding: 0.75rem 1rem;
+  border: var(--border-strong);
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 600;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.link-button:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-hard);
+}
+
+.link-button.secondary-link {
+  background: rgba(255, 251, 244, 0.92);
+}
+
 button.accent {
   background: var(--vermillion);
   color: #fff9f1;
@@ -172,6 +198,37 @@ textarea {
   gap: 0.45rem;
 }
 
+.sidebar-auth-link {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.8rem 0.9rem;
+  border: var(--border-strong);
+  background: rgba(255, 251, 244, 0.88);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.sidebar-auth-link strong {
+  font-family: var(--serif);
+  font-size: 1.02rem;
+}
+
+.sidebar-auth-link span {
+  font-weight: 700;
+}
+
+.sidebar-auth-link small {
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+.sidebar-auth-link:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow-hard);
+}
+
 .sidebar-head p,
 .sidebar-foot p,
 .helper,
@@ -238,6 +295,92 @@ textarea {
 .page-main {
   align-content: start;
   min-height: calc(100vh - 2.5rem);
+}
+
+.auth-page {
+  min-height: 100vh;
+  padding: 1.5rem;
+  display: grid;
+  place-items: center;
+}
+
+.auth-card {
+  width: min(100%, 460px);
+  display: grid;
+  gap: 1rem;
+  padding: 1.4rem;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 251, 244, 0.96),
+      rgba(245, 240, 225, 0.98)
+    ),
+    var(--paper);
+}
+
+.auth-topbar,
+.auth-header,
+.auth-session,
+.auth-footnote {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.auth-topbar {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.auth-back-link,
+.auth-text-button,
+.auth-ghost-button {
+  color: var(--ink-soft);
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-weight: 600;
+  box-shadow: none;
+  transform: none;
+}
+
+.auth-back-link:hover,
+.auth-text-button:hover,
+.auth-ghost-button:hover {
+  color: var(--vermillion);
+  box-shadow: none;
+  transform: none;
+}
+
+.auth-header h1 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: clamp(2rem, 4vw, 2.5rem);
+}
+
+.auth-subtitle {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+
+.auth-session {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border: var(--border-strong);
+  background: rgba(255, 252, 247, 0.72);
+}
+
+.auth-session-text {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.auth-actions-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
 }
 
 .notice-shell {
@@ -679,6 +822,16 @@ textarea {
   .form-grid.double,
   .form-grid.quad,
   .inline-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-page {
+    padding: 0.8rem;
+  }
+
+  .auth-topbar,
+  .auth-actions-row,
+  .auth-session {
     grid-template-columns: 1fr;
   }
 

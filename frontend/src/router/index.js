@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from "vue-router";
 import AppShell from "../layout/AppShell.vue";
 import HeroPage from "../pages/HeroPage.vue";
+import AuthPage from "../pages/AuthPage.vue";
 import UserPage from "../pages/UserPage.vue";
 import ShopTypesPage from "../pages/ShopTypesPage.vue";
 import ShopsPage from "../pages/ShopsPage.vue";
@@ -24,6 +25,15 @@ const pageComponents = {
 };
 
 const routes = [
+  {
+    path: "/auth",
+    name: "auth",
+    component: AuthPage,
+    meta: {
+      title: "登录 / 注册",
+      description: "验证码登录与首次自动注册。",
+    },
+  },
   {
     path: "/",
     component: AppShell,
