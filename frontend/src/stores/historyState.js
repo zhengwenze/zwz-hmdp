@@ -1,4 +1,6 @@
-import { ref, watch } from "vue";
+import { defineStore } from "pinia";
+import { ref, toRef, watch } from "vue";
+import { pinia } from "./pinia";
 
 function readList(key) {
   try {
@@ -16,48 +18,86 @@ function pushUnique(listRef, item, identity, limit = 8) {
   ].slice(0, limit);
 }
 
+export const useHistoryStore = defineStore("history", () => {
+  const recentShops = ref(readList("hmdp-recent-shops"));
+  const recentBlogs = ref(readList("hmdp-recent-blogs"));
+  const recentSearches = ref(readList("hmdp-recent-searches"));
+
+  function rememberShop(shop) {
+    if (!shop?.id) {
+      return;
+    }
+    pushUnique(recentShops, shop, (entry) => entry.id);
+  }
+
+  function rememberBlog(blog) {
+    if (!blog?.id) {
+      return;
+    }
+    pushUnique(recentBlogs, blog, (entry) => entry.id);
+  }
+
+  function rememberSearch(keyword) {
+    const normalized = String(keyword || "").trim();
+    if (!normalized) {
+      return;
+    }
+    pushUnique(recentSearches, normalized, (entry) => entry, 10);
+  }
+
+  function findRecentShop(shopId) {
+    return recentShops.value.find((shop) => String(shop.id) === String(shopId)) || null;
+  }
+
+  watch(
+    recentShops,
+    (value) => localStorage.setItem("hmdp-recent-shops", JSON.stringify(value)),
+    { deep: true },
+  );
+  watch(
+    recentBlogs,
+    (value) => localStorage.setItem("hmdp-recent-blogs", JSON.stringify(value)),
+    { deep: true },
+  );
+  watch(recentSearches, (value) => {
+    localStorage.setItem("hmdp-recent-searches", JSON.stringify(value));
+  });
+
+  return {
+    recentShops,
+    recentBlogs,
+    recentSearches,
+    rememberShop,
+    rememberBlog,
+    rememberSearch,
+    findRecentShop,
+  };
+});
+
+export function getHistoryStore() {
+  return useHistoryStore(pinia);
+}
+
+const historyStore = getHistoryStore();
+
 export const historyState = {
-  recentShops: ref(readList("hmdp-recent-shops")),
-  recentBlogs: ref(readList("hmdp-recent-blogs")),
-  recentSearches: ref(readList("hmdp-recent-searches")),
+  recentShops: toRef(historyStore, "recentShops"),
+  recentBlogs: toRef(historyStore, "recentBlogs"),
+  recentSearches: toRef(historyStore, "recentSearches"),
 };
 
 export function rememberShop(shop) {
-  if (!shop?.id) {
-    return;
-  }
-  pushUnique(historyState.recentShops, shop, (entry) => entry.id);
+  historyStore.rememberShop(shop);
 }
 
 export function rememberBlog(blog) {
-  if (!blog?.id) {
-    return;
-  }
-  pushUnique(historyState.recentBlogs, blog, (entry) => entry.id);
+  historyStore.rememberBlog(blog);
 }
 
 export function rememberSearch(keyword) {
-  const normalized = String(keyword || "").trim();
-  if (!normalized) {
-    return;
-  }
-  pushUnique(historyState.recentSearches, normalized, (entry) => entry, 10);
+  historyStore.rememberSearch(keyword);
 }
 
 export function findRecentShop(shopId) {
-  return historyState.recentShops.value.find((shop) => String(shop.id) === String(shopId)) || null;
+  return historyStore.findRecentShop(shopId);
 }
-
-watch(
-  historyState.recentShops,
-  (value) => localStorage.setItem("hmdp-recent-shops", JSON.stringify(value)),
-  { deep: true },
-);
-watch(
-  historyState.recentBlogs,
-  (value) => localStorage.setItem("hmdp-recent-blogs", JSON.stringify(value)),
-  { deep: true },
-);
-watch(historyState.recentSearches, (value) => {
-  localStorage.setItem("hmdp-recent-searches", JSON.stringify(value));
-});
