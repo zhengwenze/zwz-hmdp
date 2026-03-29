@@ -909,6 +909,23 @@ textarea {
   gap: 0.75rem;
 }
 
+.consumer-topnav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.consumer-topnav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 0.9rem;
+  border: var(--border-strong);
+  background: rgba(255, 251, 244, 0.84);
+  font-weight: 700;
+}
+
 .consumer-lab-link {
   font-weight: 700;
   border-bottom: 1px dashed rgba(26, 48, 85, 0.35);
@@ -983,6 +1000,13 @@ textarea {
   color: inherit;
 }
 
+.blog-preview-media-link,
+.shop-preview-media-link,
+.blog-preview-title-link,
+.shop-preview-title-link {
+  color: inherit;
+}
+
 .blog-preview-cover,
 .shop-preview-cover {
   width: 100%;
@@ -990,6 +1014,14 @@ textarea {
   object-fit: cover;
   border: var(--border-strong);
   background: rgba(239, 229, 205, 0.45);
+}
+
+.blog-preview-cover.empty,
+.shop-preview-cover.empty {
+  display: grid;
+  place-items: center;
+  color: var(--ink-soft);
+  font-family: var(--serif);
 }
 
 .blog-preview-content,
@@ -1134,6 +1166,25 @@ textarea {
   gap: 0.65rem;
 }
 
+.history-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.history-chip,
+.history-chip-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0.35rem 0.8rem;
+  border: var(--border-strong);
+  background: rgba(255, 251, 244, 0.8);
+  font-weight: 600;
+  color: inherit;
+}
+
 .consumer-list-button {
   display: flex;
   justify-content: space-between;
@@ -1229,6 +1280,10 @@ textarea {
     display: grid;
   }
 
+  .consumer-topnav {
+    flex-wrap: wrap;
+  }
+
   .consumer-type-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -1250,6 +1305,10 @@ textarea {
   .shop-detail-meta,
   .hero-grid {
     grid-template-columns: 1fr;
+  }
+
+  .consumer-topnav {
+    display: none;
   }
 
   .consumer-dock {

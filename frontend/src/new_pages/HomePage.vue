@@ -8,7 +8,9 @@ import { shopApi } from "../services/shopApi";
 import { blogApi } from "../services/blogApi";
 import { setNotice } from "../stores/appState";
 import { isLoading } from "../stores/labState";
+import { historyState, rememberSearch } from "../stores/historyState";
 import BlogPreviewCard from "../components/BlogPreviewCard.vue";
+import ShopPreviewCard from "../components/ShopPreviewCard.vue";
 
 const router = useRouter();
 const keyword = ref("");
@@ -16,6 +18,10 @@ const loadMoreRef = ref(null);
 let observer;
 
 const featuredTypes = computed(() => homeFeedState.shopTypes.value.slice(0, 10));
+const quickKeywords = computed(() => [
+  ...homeFeedState.shopTypes.value.slice(0, 4).map((item) => item.name),
+  ...historyState.recentSearches.value.slice(0, 4),
+].filter((value, index, source) => value && source.indexOf(value) === index).slice(0, 6));
 
 async function ensureTypes() {
   if (homeFeedState.shopTypes.value.length) {
@@ -66,11 +72,17 @@ function submitSearch() {
     setNotice("info", "请输入商户名或地点关键词。");
     return;
   }
+  rememberSearch(keyword.value);
   router.push({
     name: "shop-list",
     params: { typeId: "all" },
     query: { keyword: keyword.value.trim() },
   });
+}
+
+function searchByKeyword(value) {
+  keyword.value = value;
+  submitSearch();
 }
 
 function openType(type) {
@@ -118,6 +130,17 @@ onBeforeUnmount(() => observer?.disconnect());
         <button class="accent" @click="submitSearch">搜索商铺</button>
       </div>
 
+      <div class="consumer-inline-type-list">
+        <button
+          v-for="item in quickKeywords"
+          :key="item"
+          class="secondary"
+          @click="searchByKeyword(item)"
+        >
+          {{ item }}
+        </button>
+      </div>
+
       <div class="hero-grid">
         <div class="info-card ukiyo-e-digital-card">
           <span class="label">会话</span>
@@ -134,6 +157,24 @@ onBeforeUnmount(() => observer?.disconnect());
           <strong>{{ homeFeedState.hotBlogs.value.length }}</strong>
           <small>下拉自动续载更多内容</small>
         </div>
+      </div>
+    </section>
+
+    <section v-if="historyState.recentShops.value.length" class="module-section">
+      <div class="section-title">
+        <div>
+          <p class="eyebrow">Resume</p>
+          <h2>继续浏览</h2>
+        </div>
+        <span class="section-hint">保留最近看过的店铺，减少重复搜索</span>
+      </div>
+
+      <div class="shop-feed-grid">
+        <ShopPreviewCard
+          v-for="shop in historyState.recentShops.value.slice(0, 2)"
+          :key="shop.id"
+          :shop="shop"
+        />
       </div>
     </section>
 

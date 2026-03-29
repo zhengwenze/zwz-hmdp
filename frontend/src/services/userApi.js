@@ -57,4 +57,11 @@ export const userApi = {
       options,
     );
   },
+  updateNickName(nickName, options = {}) {
+    return apiRequest(
+      "PUT /user/nickname",
+      { method: "PUT", path: "/user/nickname", query: { nickName } },
+      options,
+    );
+  },
 };

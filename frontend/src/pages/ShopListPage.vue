@@ -12,11 +12,14 @@ import { homeFeedState } from "../stores/homeFeed";
 import { shopApi } from "../services/shopApi";
 import { isLoading } from "../stores/labState";
 import { setNotice } from "../stores/appState";
+import { historyState, rememberSearch } from "../stores/historyState";
 import ShopPreviewCard from "../components/ShopPreviewCard.vue";
 
 const route = useRoute();
 const router = useRouter();
 const loadMoreRef = ref(null);
+const localKeyword = ref("");
+const sortMode = ref("default");
 let observer;
 
 const keyword = computed(() => String(route.query.keyword || "").trim());
@@ -32,6 +35,21 @@ const typeName = computed(() => {
 const pageTitle = computed(() =>
   keyword.value ? `搜索“${keyword.value}”` : `${typeName.value}商铺`,
 );
+const displayShops = computed(() => {
+  const rows = [...shopFlowState.shops.value];
+  if (sortMode.value === "score") {
+    return rows.sort((a, b) => (b.score || 0) - (a.score || 0));
+  }
+  if (sortMode.value === "price") {
+    return rows.sort(
+      (a, b) => (a.avgPrice || Number.MAX_SAFE_INTEGER) - (b.avgPrice || Number.MAX_SAFE_INTEGER),
+    );
+  }
+  if (sortMode.value === "comments") {
+    return rows.sort((a, b) => (b.comments || 0) - (a.comments || 0));
+  }
+  return rows;
+});
 
 async function ensureTypes() {
   if (homeFeedState.shopTypes.value.length) {
@@ -61,6 +79,7 @@ async function requestCurrentPage(reset = false) {
 
   let result;
   if (keyword.value) {
+    rememberSearch(keyword.value);
     result = await shopApi.fetchByName(
       { name: keyword.value, current: shopFlowState.currentPage.value },
       { silentError: true },
@@ -99,6 +118,20 @@ function openType(type) {
   });
 }
 
+function submitListSearch() {
+  if (!localKeyword.value.trim()) {
+    setNotice("info", "请输入关键词后再搜索。");
+    return;
+  }
+
+  rememberSearch(localKeyword.value);
+  router.push({
+    name: "shop-list",
+    params: { typeId: "all" },
+    query: { keyword: localKeyword.value.trim() },
+  });
+}
+
 function enableGeolocation() {
   if (!navigator.geolocation) {
     setNotice("error", "当前浏览器不支持定位。");
@@ -122,12 +155,14 @@ function enableGeolocation() {
 watch(
   () => [route.params.typeId, route.query.keyword, route.query.name],
   async () => {
+    localKeyword.value = keyword.value;
     await requestCurrentPage(true);
   },
 );
 
 onMounted(async () => {
   await ensureTypes();
+  localKeyword.value = keyword.value;
   await requestCurrentPage(true);
 
   if ("IntersectionObserver" in window && loadMoreRef.value) {
@@ -158,7 +193,18 @@ onBeforeUnmount(() => observer?.disconnect());
     <article class="panel ue-washi ue-shadow">
       <div class="panel-head">
         <h3>筛选与切换</h3>
-        <span class="status-pill muted">{{ shopFlowState.location.enabled ? "已启用定位" : "普通列表模式" }}</span>
+        <span class="status-pill muted">
+          {{ shopFlowState.location.enabled ? "已启用定位" : `共 ${shopFlowState.shops.value.length} 家` }}
+        </span>
+      </div>
+
+      <div class="consumer-search-bar">
+        <input
+          v-model="localKeyword"
+          placeholder="换个关键词继续搜店铺"
+          @keyup.enter="submitListSearch"
+        />
+        <button class="accent" @click="submitListSearch">重新搜索</button>
       </div>
 
       <div class="button-row wrap">
@@ -170,8 +216,10 @@ onBeforeUnmount(() => observer?.disconnect());
         >
           使用当前位置排序
         </button>
-        <button disabled class="secondary">人气排序（后续开放）</button>
-        <button disabled class="secondary">评分排序（后续开放）</button>
+        <button :class="sortMode === 'default' ? 'accent' : 'secondary'" @click="sortMode = 'default'">推荐</button>
+        <button :class="sortMode === 'comments' ? 'accent' : 'secondary'" @click="sortMode = 'comments'">人气</button>
+        <button :class="sortMode === 'score' ? 'accent' : 'secondary'" @click="sortMode = 'score'">评分</button>
+        <button :class="sortMode === 'price' ? 'accent' : 'secondary'" @click="sortMode = 'price'">价格</button>
       </div>
 
       <div v-if="!keyword" class="consumer-inline-type-list">
@@ -185,11 +233,22 @@ onBeforeUnmount(() => observer?.disconnect());
           {{ type.name }}
         </button>
       </div>
+
+      <div v-if="historyState.recentSearches.value.length" class="history-chip-list">
+        <button
+          v-for="item in historyState.recentSearches.value.slice(0, 6)"
+          :key="item"
+          class="secondary history-chip-button"
+          @click="localKeyword = item; submitListSearch()"
+        >
+          {{ item }}
+        </button>
+      </div>
     </article>
 
     <div class="shop-feed-grid">
       <ShopPreviewCard
-        v-for="shop in shopFlowState.shops.value"
+        v-for="shop in displayShops"
         :key="shop.id"
         :shop="shop"
       />

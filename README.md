@@ -1,6 +1,6 @@
-# 高并发电商秒杀平台
+Spring Boot# 高并发电商秒杀平台
 
-**后端技术栈：** Java、Spring Boot、Spring Data Redis、MyBatis Plus、Redisson、MySQL、Redis、Redis Stream、Lombok、Hutool
+**后端技术栈：** Java、、Spring Data Redis、MyBatis Plus、Redisson、MySQL、Redis、Redis Stream、Lombok、Hutool
 
 **前端技术栈：** Vue 3、Vue Router、Pinia State、Vite、Axios
 

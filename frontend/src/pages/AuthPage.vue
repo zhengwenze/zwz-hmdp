@@ -1,12 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
-import {
-  sharedState,
-  send,
-  isLoading,
-  setNotice,
-} from "../stores/sharedState";
+import { sharedState, send, isLoading, setNotice } from "../stores/sharedState";
 
 const route = useRoute();
 const router = useRouter();
@@ -25,7 +20,11 @@ const redirectTarget = computed(() => {
     ? route.query.redirect[0]
     : route.query.redirect;
 
-  if (typeof raw !== "string" || !raw.startsWith("/") || raw.startsWith("/auth")) {
+  if (
+    typeof raw !== "string" ||
+    !raw.startsWith("/") ||
+    raw.startsWith("/auth")
+  ) {
     return "/";
   }
 
@@ -43,7 +42,9 @@ async function fetchMe(options = {}) {
     "GET /user/me",
     { method: "GET", path: "/user/me" },
     {
-      successMessage: options.silent ? "认证页已同步当前登录用户。" : "已刷新当前登录用户。",
+      successMessage: options.silent
+        ? "认证页已同步当前登录用户。"
+        : "已刷新当前登录用户。",
       onSuccess: (data) => {
         sharedState.currentUser.value = data || null;
       },
@@ -109,7 +110,9 @@ function clearLocalToken() {
   <section class="auth-page">
     <article class="auth-card ue-washi ue-shadow">
       <div class="auth-topbar">
-        <RouterLink :to="redirectTarget" class="auth-back-link">返回来源页</RouterLink>
+        <RouterLink :to="redirectTarget" class="auth-back-link"
+          >返回来源页</RouterLink
+        >
         <button
           v-if="sharedState.token.value.trim()"
           class="auth-ghost-button"
@@ -126,11 +129,20 @@ function clearLocalToken() {
       </div>
 
       <div class="auth-session">
-        <span :class="sharedState.currentUser.value ? 'status-pill success' : 'status-pill muted'">
+        <span
+          :class="
+            sharedState.currentUser.value
+              ? 'status-pill success'
+              : 'status-pill muted'
+          "
+        >
           {{ sharedState.currentUser.value ? "已登录" : "未登录" }}
         </span>
         <span class="auth-session-text">
-          {{ sharedState.currentUser.value?.nickName || "请输入手机号并获取验证码" }}
+          {{
+            sharedState.currentUser.value?.nickName ||
+            "请输入手机号并获取验证码"
+          }}
         </span>
       </div>
 
@@ -150,8 +162,14 @@ function clearLocalToken() {
       </p>
 
       <div class="auth-actions-row">
-        <button :disabled="isLoading('POST /user/code')" @click="sendCode">发送验证码</button>
-        <button :disabled="isLoading('POST /user/login')" class="accent" @click="login">
+        <button :disabled="isLoading('POST /user/code')" @click="sendCode">
+          发送验证码
+        </button>
+        <button
+          :disabled="isLoading('POST /user/login')"
+          class="accent"
+          @click="login"
+        >
           登录
         </button>
       </div>

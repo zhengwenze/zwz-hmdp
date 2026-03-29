@@ -48,4 +48,13 @@ public interface IUserService extends IService<User> {
      * @return {@link Result}
      */
     Result signCount();
+
+    /**
+     * 更新用户昵称
+     *
+     * @param nickName 新昵称
+     * @param token    当前登录token
+     * @return {@link Result}
+     */
+    Result updateNickName(String nickName, String token);
 }

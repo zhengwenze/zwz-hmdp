@@ -16,7 +16,7 @@ const sessionLabel = computed(
 );
 const navItems = [
   { label: "首页", to: "/" },
-  { label: "发笔记", to: "/blog/new" },
+  { label: "笔记", to: "/blog/new" },
   { label: "我的", to: "/me" },
 ];
 
@@ -34,10 +34,10 @@ onMounted(async () => {
   <div class="consumer-shell">
     <header class="consumer-topbar ue-shadow ue-washi">
       <RouterLink to="/" class="consumer-brand">
-        <span class="ue-stamp">江户评</span>
+        <span class="ue-stamp">郑文泽</span>
         <div>
-          <strong>黑马点评</strong>
-          <small>Ukiyo-e Digital</small>
+          <strong>高并发电商秒杀平台</strong>
+          <small>Spring Boot + Vue</small>
         </div>
       </RouterLink>
       <nav class="consumer-topnav">
@@ -57,29 +57,14 @@ onMounted(async () => {
         >
           {{ sessionLabel }}
         </span>
-        <RouterLink to="/lab" class="consumer-lab-link">秘藏工房</RouterLink>
+        <RouterLink to="/lab" class="consumer-lab-link">旧版</RouterLink>
       </div>
     </header>
-
-    <div class="notice-bar notice-shell" :class="appState.notice.type">
-      <span class="ue-stamp">
-        {{
-          appState.notice.type === "error"
-            ? "警示"
-            : appState.notice.type === "success"
-              ? "已响应"
-              : "提示"
-        }}
-      </span>
-      <span>{{ appState.notice.message }}</span>
-    </div>
-
     <div class="consumer-stage">
       <main class="consumer-main">
         <RouterView />
       </main>
     </div>
-
     <ConsumerDock v-if="showDock" />
   </div>
 </template>

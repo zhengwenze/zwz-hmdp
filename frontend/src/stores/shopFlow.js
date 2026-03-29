@@ -10,6 +10,8 @@ export const shopFlowState = {
   shops: ref([]),
   selectedShop: ref(null),
   vouchers: ref([]),
+  detailLoading: ref(false),
+  detailError: ref(""),
   location: reactive({
     x: "",
     y: "",

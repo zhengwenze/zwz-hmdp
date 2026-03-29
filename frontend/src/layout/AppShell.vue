@@ -7,9 +7,10 @@ import { sharedState } from "../stores/sharedState";
 
 const route = useRoute();
 
-const authStatus = computed(() =>
-  sharedState.currentUser.value?.nickName
-    || (sharedState.token.value.trim() ? "本地 token 已保存" : "未登录"),
+const authStatus = computed(
+  () =>
+    sharedState.currentUser.value?.nickName ||
+    (sharedState.token.value.trim() ? "本地 token 已保存" : "未登录"),
 );
 
 const authRoute = computed(() => ({

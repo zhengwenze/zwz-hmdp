@@ -6,12 +6,15 @@ import { blogFlowState } from "../stores/blogFlow";
 import { userApi } from "../services/userApi";
 import { blogApi } from "../services/blogApi";
 import { formatDateTime } from "../utils/view";
+import { historyState } from "../stores/historyState";
 import BlogPreviewCard from "../components/BlogPreviewCard.vue";
 
 const router = useRouter();
 const activeTab = ref("notes");
 const userInfo = ref(null);
 const signCount = ref("--");
+const showNicknameEditor = ref(false);
+const newNickname = ref("");
 
 const followFeedCards = computed(() => blogFlowState.followFeed.value);
 
@@ -81,6 +84,32 @@ function handleLogout() {
   router.push("/");
 }
 
+function openNicknameEditor() {
+  newNickname.value = sessionState.currentUser.value?.nickName || "";
+  showNicknameEditor.value = true;
+}
+
+async function submitNicknameUpdate() {
+  if (!newNickname.value.trim()) {
+    return;
+  }
+  const { success } = await userApi.updateNickName(newNickname.value.trim(), {
+    successMessage: "昵称修改成功。",
+  });
+  if (success) {
+    sessionState.currentUser.value = {
+      ...sessionState.currentUser.value,
+      nickName: newNickname.value.trim(),
+    };
+    showNicknameEditor.value = false;
+  }
+}
+
+function cancelNicknameEdit() {
+  showNicknameEditor.value = false;
+  newNickname.value = "";
+}
+
 onMounted(loadMe);
 </script>
 
@@ -89,7 +118,22 @@ onMounted(loadMe);
     <article class="panel ue-washi ue-shadow">
       <div class="panel-head">
         <h2>{{ sessionState.currentUser.value?.nickName || "我的主页" }}</h2>
-        <button class="secondary" @click="handleLogout">退出本地登录</button>
+        <button class="secondary" @click="loadMe">刷新主页</button>
+        <button class="accent" @click="openNicknameEditor">修改昵称</button>
+      </div>
+
+      <div v-if="showNicknameEditor" class="nickname-editor">
+        <input
+          v-model="newNickname"
+          type="text"
+          placeholder="请输入新昵称"
+          maxlength="32"
+          @keyup.enter="submitNicknameUpdate"
+        />
+        <div class="button-row wrap">
+          <button class="accent" @click="submitNicknameUpdate">保存</button>
+          <button class="secondary" @click="cancelNicknameEdit">取消</button>
+        </div>
       </div>
 
       <div class="shop-detail-meta">
@@ -112,8 +156,26 @@ onMounted(loadMe);
       </div>
 
       <div class="button-row wrap">
-        <button @click="signToday">今日签到</button>
         <RouterLink to="/blog/new" class="link-button">去发笔记</RouterLink>
+        <button @click="signToday">今日签到</button>
+        <button class="secondary" @click="handleLogout">退出登录</button>
+      </div>
+    </article>
+
+    <article v-if="historyState.recentShops.value.length" class="panel ue-washi ue-shadow">
+      <div class="panel-head">
+        <h3>最近逛过</h3>
+        <span class="status-pill muted">减少重复搜索</span>
+      </div>
+      <div class="history-chip-list">
+        <RouterLink
+          v-for="shop in historyState.recentShops.value.slice(0, 5)"
+          :key="shop.id"
+          :to="`/shop/${shop.id}`"
+          class="history-chip"
+        >
+          {{ shop.name }}
+        </RouterLink>
       </div>
     </article>
 

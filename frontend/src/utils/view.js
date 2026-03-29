@@ -8,11 +8,18 @@ export function splitImages(rawValue) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean)
+    .filter(isRenderableImage)
     .map((item) => toAssetUrl(item));
 }
 
 export function firstImage(rawValue) {
   return splitImages(rawValue)[0] || "";
+}
+
+function isRenderableImage(value) {
+  return /^https?:\/\//.test(value)
+    || value.startsWith("/")
+    || /\.(png|jpe?g|gif|webp|svg)$/i.test(value);
 }
 
 export function formatPrice(value) {
@@ -50,6 +57,35 @@ export function formatDateTime(value) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+export function stripHtml(value) {
+  return String(value || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function excerpt(value, maxLength = 78) {
+  const plain = stripHtml(value);
+  if (!plain) {
+    return "暂无摘要";
+  }
+  return plain.length > maxLength ? `${plain.slice(0, maxLength)}...` : plain;
+}
+
+export function renderRichText(value) {
+  return String(value || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<(br|\/p|\/div|\/li)\s*\/?>/gi, "<br>")
+    .replace(/<(p|div|li|ul|ol)[^>]*>/gi, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\n/g, "<br>")
+    .replace(/(<br>\s*){3,}/gi, "<br><br>");
 }
 
 export function formatVoucherWindow(voucher) {

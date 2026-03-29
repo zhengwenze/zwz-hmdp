@@ -96,4 +96,10 @@ public class UserController {
     public Result signCount() {
         return userService.signCount();
     }
+
+    @PutMapping("/nickname")
+    public Result updateNickName(@RequestParam("nickName") String nickName,
+                                  @RequestHeader(value = "authorization", required = false) String token) {
+        return userService.updateNickName(nickName, token);
+    }
 }

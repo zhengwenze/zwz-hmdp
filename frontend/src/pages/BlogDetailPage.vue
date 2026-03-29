@@ -7,8 +7,9 @@ import { blogApi } from "../services/blogApi";
 import { followApi } from "../services/followApi";
 import { shopApi } from "../services/shopApi";
 import { shopFlowState } from "../stores/shopFlow";
-import { splitImages, formatDateTime } from "../utils/view";
+import { splitImages, formatDateTime, renderRichText, excerpt } from "../utils/view";
 import { setNotice } from "../stores/appState";
+import { rememberBlog, rememberShop } from "../stores/historyState";
 
 const route = useRoute();
 const router = useRouter();
@@ -19,6 +20,7 @@ const images = computed(() => splitImages(blogFlowState.detailBlog.value?.images
 const isOwnBlog = computed(
   () => sessionState.currentUser.value?.id === blogFlowState.detailBlog.value?.userId,
 );
+const richContent = computed(() => renderRichText(blogFlowState.detailBlog.value?.content));
 
 async function loadDetail() {
   const blogId = route.params.id;
@@ -28,6 +30,7 @@ async function loadDetail() {
   }
 
   blogFlowState.detailBlog.value = detailResult.data || null;
+  rememberBlog(detailResult.data);
   activeImage.value = 0;
 
   await Promise.all([
@@ -41,6 +44,7 @@ async function loadDetail() {
       silentError: true,
       onSuccess: (data) => {
         shopFlowState.selectedShop.value = data || null;
+        rememberShop(data);
       },
     }),
   ]);
@@ -156,7 +160,7 @@ onMounted(loadDetail);
       </div>
 
       <div class="consumer-rich-copy blog-detail-content">
-        <p>{{ blogFlowState.detailBlog.value?.content || "暂无正文" }}</p>
+        <div v-html="richContent || excerpt(blogFlowState.detailBlog.value?.content, 320)" />
       </div>
 
       <div class="button-row wrap">
@@ -167,6 +171,20 @@ onMounted(loadDetail);
         <button class="secondary" @click="openShop">
           查看关联商铺
         </button>
+      </div>
+    </article>
+
+    <article v-if="shopFlowState.selectedShop.value" class="panel ue-washi ue-shadow">
+      <div class="panel-head">
+        <h3>关联店铺</h3>
+        <span class="status-pill muted">从笔记继续转店铺</span>
+      </div>
+      <div class="consumer-list-button">
+        <div>
+          <strong>{{ shopFlowState.selectedShop.value.name }}</strong>
+          <p class="shop-preview-address">{{ shopFlowState.selectedShop.value.address || "地址待补充" }}</p>
+        </div>
+        <button class="accent" @click="openShop">去看店铺详情</button>
       </div>
     </article>
 
@@ -188,7 +206,7 @@ onMounted(loadDetail);
 
     <article class="panel ue-washi ue-shadow">
       <div class="panel-head">
-        <h3>评论区说明</h3>
+        <h3>当前限制</h3>
         <span class="status-pill muted">显式降级</span>
       </div>
       <p class="helper">

@@ -7,6 +7,7 @@ import { blogApi } from "../services/blogApi";
 import { uploadApi } from "../services/uploadApi";
 import { setNotice } from "../stores/appState";
 import { toAssetUrl } from "../stores/appState";
+import { historyState, rememberShop } from "../stores/historyState";
 
 const router = useRouter();
 
@@ -15,8 +16,8 @@ const shopSearch = ref("");
 const shopCandidates = ref([]);
 
 const form = reactive({
-  title: "",
-  content: "",
+  title: blogFlowState.draft.title,
+  content: blogFlowState.draft.content,
 });
 
 function onUploadFileChange(event) {
@@ -71,6 +72,7 @@ async function searchShops() {
 function selectShop(shop) {
   blogFlowState.draft.shopId = String(shop.id);
   blogFlowState.draft.shopName = shop.name;
+  rememberShop(shop);
 }
 
 async function publishBlog() {
@@ -98,6 +100,8 @@ async function publishBlog() {
   if (success) {
     form.title = "";
     form.content = "";
+    blogFlowState.draft.title = "";
+    blogFlowState.draft.content = "";
     blogFlowState.draft.shopId = "";
     blogFlowState.draft.shopName = "";
     blogFlowState.draft.images = [];
@@ -117,11 +121,20 @@ async function publishBlog() {
       <div class="form-grid single">
         <label>
           <span>标题</span>
-          <input v-model="form.title" placeholder="填一个更容易上首页的标题" />
+          <input
+            v-model="form.title"
+            placeholder="先写一个别人愿意点开的标题"
+            @input="blogFlowState.draft.title = form.title"
+          />
         </label>
         <label>
           <span>正文</span>
-          <textarea v-model="form.content" rows="8" placeholder="记录探店体验、菜品印象和推荐理由" />
+          <textarea
+            v-model="form.content"
+            rows="8"
+            placeholder="先写亮点，再写环境、味道和是否值得去"
+            @input="blogFlowState.draft.content = form.content"
+          />
         </label>
       </div>
 
@@ -149,6 +162,16 @@ async function publishBlog() {
         <h3>关联商铺</h3>
         <span class="status-pill muted">{{ blogFlowState.draft.shopName || "未选择" }}</span>
       </div>
+      <div v-if="historyState.recentShops.value.length" class="history-chip-list">
+        <button
+          v-for="shop in historyState.recentShops.value.slice(0, 4)"
+          :key="shop.id"
+          class="secondary history-chip-button"
+          @click="selectShop(shop)"
+        >
+          {{ shop.name }}
+        </button>
+      </div>
       <div class="button-row wrap">
         <input v-model="shopSearch" placeholder="输入商铺名称搜索" @keyup.enter="searchShops" />
         <button @click="searchShops">搜索</button>
@@ -168,6 +191,7 @@ async function publishBlog() {
 
     <div class="button-row wrap">
       <button class="accent" @click="publishBlog">发布笔记</button>
+      <span class="helper">草稿会自动保存在本地，刷新页面也不会丢。</span>
     </div>
   </section>
 </template>

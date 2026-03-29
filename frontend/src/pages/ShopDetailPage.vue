@@ -7,14 +7,19 @@ import { voucherApi } from "../services/voucherApi";
 import { splitImages, formatPrice, formatVoucherWindow, voucherState } from "../utils/view";
 import { isAuthenticated } from "../stores/session";
 import { setNotice } from "../stores/appState";
+import { findRecentShop, rememberShop } from "../stores/historyState";
 
 const route = useRoute();
 const router = useRouter();
 
-const shopImages = computed(() => splitImages(shopFlowState.selectedShop.value?.images));
+const fallbackShop = computed(() => findRecentShop(route.params.id));
+const resolvedShop = computed(() => shopFlowState.selectedShop.value || fallbackShop.value);
+const shopImages = computed(() => splitImages(resolvedShop.value?.images));
 
 async function loadShop() {
   const shopId = route.params.id;
+  shopFlowState.detailLoading.value = true;
+  shopFlowState.detailError.value = "";
   const [shopResult, voucherResult] = await Promise.all([
     shopApi.fetchDetail(shopId, { silentError: true }),
     voucherApi.fetchList(shopId, { silentError: true }),
@@ -22,11 +27,16 @@ async function loadShop() {
 
   if (shopResult.success) {
     shopFlowState.selectedShop.value = shopResult.data || null;
+    rememberShop(shopFlowState.selectedShop.value);
+  } else {
+    shopFlowState.selectedShop.value = null;
+    shopFlowState.detailError.value = "店铺详情暂时拉取失败，先用列表里的摘要信息兜底展示。";
   }
 
   if (voucherResult.success) {
     shopFlowState.vouchers.value = Array.isArray(voucherResult.data) ? voucherResult.data : [];
   }
+  shopFlowState.detailLoading.value = false;
 }
 
 async function handleVoucher(voucher) {
@@ -61,36 +71,44 @@ onMounted(loadShop);
   <section class="consumer-page">
     <article class="panel ue-washi ue-shadow">
       <div class="panel-head">
-        <h2>{{ shopFlowState.selectedShop.value?.name || "商铺详情" }}</h2>
+        <h2>{{ resolvedShop?.name || "商铺详情" }}</h2>
         <button class="secondary" @click="router.back()">返回列表</button>
       </div>
+
+      <p v-if="shopFlowState.detailError.value" class="helper">{{ shopFlowState.detailError.value }}</p>
+      <p v-if="shopFlowState.detailLoading.value" class="helper">正在整理店铺详情...</p>
 
       <div class="shop-detail-meta">
         <div>
           <span class="label">评分</span>
-          <strong>{{ ((shopFlowState.selectedShop.value?.score || 0) / 10).toFixed(1) }}</strong>
+          <strong>{{ ((resolvedShop?.score || 0) / 10).toFixed(1) }}</strong>
         </div>
         <div>
           <span class="label">评论</span>
-          <strong>{{ shopFlowState.selectedShop.value?.comments ?? 0 }}</strong>
+          <strong>{{ resolvedShop?.comments ?? 0 }}</strong>
         </div>
         <div>
           <span class="label">均价</span>
-          <strong>￥{{ formatPrice(shopFlowState.selectedShop.value?.avgPrice) }}/人</strong>
+          <strong>￥{{ formatPrice(resolvedShop?.avgPrice) }}/人</strong>
         </div>
         <div>
           <span class="label">营业时间</span>
-          <strong>{{ shopFlowState.selectedShop.value?.openHours || "--" }}</strong>
+          <strong>{{ resolvedShop?.openHours || "--" }}</strong>
         </div>
       </div>
 
       <div class="image-strip shop-detail-gallery">
-        <img v-for="image in shopImages" :key="image" :src="image" :alt="shopFlowState.selectedShop.value?.name" />
+        <img v-for="image in shopImages" :key="image" :src="image" :alt="resolvedShop?.name" />
       </div>
 
       <div class="consumer-rich-copy">
-        <p>{{ shopFlowState.selectedShop.value?.area || "商圈待补充" }}</p>
-        <p>{{ shopFlowState.selectedShop.value?.address || "地址待补充" }}</p>
+        <p>{{ resolvedShop?.area || "商圈待补充" }}</p>
+        <p>{{ resolvedShop?.address || "地址待补充" }}</p>
+      </div>
+
+      <div class="button-row wrap">
+        <button class="accent" @click="router.push('/blog/new')">去发探店笔记</button>
+        <button class="secondary" @click="router.push('/')">继续逛别的店</button>
       </div>
     </article>
 
@@ -127,7 +145,7 @@ onMounted(loadShop);
 
     <article class="panel ue-washi ue-shadow">
       <div class="panel-head">
-        <h3>评价区说明</h3>
+        <h3>当前限制</h3>
         <span class="status-pill muted">显式降级</span>
       </div>
       <p class="helper">
