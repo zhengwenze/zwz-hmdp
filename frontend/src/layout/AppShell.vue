@@ -9,8 +9,8 @@ import { sharedState } from "../stores/sharedState";
   <div class="shell">
     <aside class="sidebar ue-shadow ue-washi">
       <div class="sidebar-head">
-        <div class="ue-stamp">浮世绘联调台</div>
-        <p>每个页面只处理一个模块，左侧统一负责导航。</p>
+        <div class="ue-stamp">菜单</div>
+        <p>登录 / 注册</p>
       </div>
       <SidebarNav :items="sidebarModules" />
     </aside>
