@@ -31,8 +31,8 @@ const noticeTitle = computed(() => {
 });
 const currentUserLabel = computed(
   () =>
-    sessionState.currentUser.value?.nickName
-    || (isAuthenticated() ? "已登录" : "未登录"),
+    sessionState.currentUser.value?.nickName ||
+    (isAuthenticated() ? "已登录" : "未登录"),
 );
 
 async function syncCurrentUser() {
@@ -71,11 +71,7 @@ onMounted(syncCurrentUser);
         <span class="app-sidebar__hint">统一布局、统一结构、统一视觉</span>
       </div>
       <ElScrollbar class="app-sidebar__scroll">
-        <ElMenu
-          :default-active="route.path"
-          router
-          class="app-menu"
-        >
+        <ElMenu :default-active="route.path" router class="app-menu">
           <ElMenuItem
             v-for="item in menuItems"
             :key="item.path"
@@ -103,12 +99,7 @@ onMounted(syncCurrentUser);
           <ElButton v-if="!isAuthenticated()" @click="router.push('/login')">
             去登录
           </ElButton>
-          <ElButton
-            v-else
-            type="primary"
-            plain
-            @click="handleLogout"
-          >
+          <ElButton v-else type="primary" plain @click="handleLogout">
             退出登录
           </ElButton>
         </div>
@@ -120,7 +111,13 @@ onMounted(syncCurrentUser);
             v-if="appState.notice.message"
             :title="noticeTitle"
             :description="appState.notice.message"
-            :type="appState.notice.type === 'error' ? 'error' : appState.notice.type === 'success' ? 'success' : 'info'"
+            :type="
+              appState.notice.type === 'error'
+                ? 'error'
+                : appState.notice.type === 'success'
+                  ? 'success'
+                  : 'info'
+            "
             :closable="false"
             show-icon
           />
