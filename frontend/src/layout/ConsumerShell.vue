@@ -3,17 +3,22 @@ import { computed, onMounted } from "vue";
 import { RouterLink, RouterView, useRoute } from "vue-router";
 import { appState } from "../stores/appState";
 import { sessionState, isAuthenticated } from "../stores/session";
-import { homeFeedState } from "../stores/homeFeed";
-import { blogFlowState } from "../stores/blogFlow";
 import { userApi } from "../services/userApi";
 import ConsumerDock from "../components/ConsumerDock.vue";
 
 const route = useRoute();
 
 const showDock = computed(() => route.meta.showDock !== false);
-const sessionLabel = computed(() =>
-  sessionState.currentUser.value?.nickName || (isAuthenticated() ? "已登录" : "未登录"),
+const sessionLabel = computed(
+  () =>
+    sessionState.currentUser.value?.nickName ||
+    (isAuthenticated() ? "已登录" : "未登录"),
 );
+const navItems = [
+  { label: "首页", to: "/" },
+  { label: "发笔记", to: "/blog/new" },
+  { label: "我的", to: "/me" },
+];
 
 onMounted(async () => {
   if (isAuthenticated() && !sessionState.currentUser.value) {
@@ -35,8 +40,21 @@ onMounted(async () => {
           <small>Ukiyo-e Digital</small>
         </div>
       </RouterLink>
+      <nav class="consumer-topnav">
+        <RouterLink
+          v-for="item in navItems"
+          :key="item.to"
+          :to="item.to"
+          class="consumer-topnav-link"
+        >
+          {{ item.label }}
+        </RouterLink>
+      </nav>
       <div class="consumer-topbar-meta">
-        <span class="status-pill" :class="isAuthenticated() ? 'success' : 'muted'">
+        <span
+          class="status-pill"
+          :class="isAuthenticated() ? 'success' : 'muted'"
+        >
           {{ sessionLabel }}
         </span>
         <RouterLink to="/lab" class="consumer-lab-link">秘藏工房</RouterLink>
@@ -60,35 +78,6 @@ onMounted(async () => {
       <main class="consumer-main">
         <RouterView />
       </main>
-
-      <aside class="consumer-rail panel ue-washi ue-shadow">
-        <div class="panel-head">
-          <h3>浮世绘导览</h3>
-          <span class="status-pill muted">桌面优先</span>
-        </div>
-        <div class="consumer-rail-block">
-          <span class="label">当前会话</span>
-          <strong>{{ sessionLabel }}</strong>
-          <small>{{ isAuthenticated() ? "authorization 已自动注入" : "未登录时仅可访问公开链路" }}</small>
-        </div>
-        <div class="consumer-rail-block">
-          <span class="label">首页状态</span>
-          <strong>{{ homeFeedState.shopTypes.value.length }} 个分类</strong>
-          <small>热门笔记 {{ homeFeedState.hotBlogs.value.length }} 条</small>
-        </div>
-        <div class="consumer-rail-block">
-          <span class="label">发布缓存</span>
-          <strong>{{ blogFlowState.uploadedImages.value.length }} 张</strong>
-          <small>最近上传的图片保存在本地草稿中</small>
-        </div>
-        <RouterLink
-          v-if="!isAuthenticated()"
-          :to="{ path: '/login', query: { redirect: route.fullPath || '/' } }"
-          class="link-button"
-        >
-          登录后体验完整链路
-        </RouterLink>
-      </aside>
     </div>
 
     <ConsumerDock v-if="showDock" />
