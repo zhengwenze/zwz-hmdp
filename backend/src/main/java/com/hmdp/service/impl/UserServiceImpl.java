@@ -5,6 +5,7 @@ import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.LoginFormDTO;
 import com.hmdp.dto.Result;
@@ -109,6 +110,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     }
 
     @Override
+    public Result logout(String token) {
+        if (token != null && !token.trim().isEmpty()) {
+            stringRedisTemplate.delete(LOGIN_USER_KEY + token.trim());
+        }
+        return Result.ok();
+    }
+
+    @Override
     public Result sign() {
         // 获取当前登陆用户
         Long id = UserHolder.getUser().getId();
@@ -192,7 +201,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             return Result.fail("用户未登录");
         }
 
-        int rows = baseMapper.update(null, new LambdaQueryWrapper<User>()
+        int rows = baseMapper.update(null, new LambdaUpdateWrapper<User>()
                 .eq(User::getId, userId)
                 .set(User::getNickName, nickName));
 

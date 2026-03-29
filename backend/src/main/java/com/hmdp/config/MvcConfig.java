@@ -2,14 +2,15 @@ package com.hmdp.config;
 
 import com.hmdp.interceptor.LoginInterceptor;
 import com.hmdp.interceptor.RefreshTokenInterceptor;
-import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
-import org.springframework.cache.annotation.CacheConfig;
+import com.hmdp.utils.SystemConstants;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import javax.annotation.Resource;
+import java.nio.file.Paths;
 
 /**
  * mvc配置
@@ -34,6 +35,7 @@ public class MvcConfig implements WebMvcConfigurer {
                         , "/shop-type/**"
                         , "/upload/**"
                         , "/voucher/**"
+                        , "/blogs/**"
                 )
                 .order(1);
         //Token续命拦截器
@@ -41,5 +43,11 @@ public class MvcConfig implements WebMvcConfigurer {
                 .addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate))
                 .addPathPatterns("/**")
                 .order(0);
+    }
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        registry.addResourceHandler("/blogs/**")
+                .addResourceLocations(Paths.get(SystemConstants.IMAGE_UPLOAD_DIR, "blogs").toUri().toString());
     }
 }
