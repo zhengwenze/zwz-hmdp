@@ -1,255 +1,181 @@
 <script setup>
-import { computed, onMounted, onBeforeUnmount, ref } from "vue";
+import { computed } from "vue";
 import { useRouter } from "vue-router";
-import { homeFeedState } from "../stores/homeFeed";
-import { sessionState } from "../stores/session";
-import { toAssetUrl } from "../stores/appState";
-import { shopApi } from "../services/shopApi";
-import { blogApi } from "../services/blogApi";
-import { setNotice } from "../stores/appState";
-import { isLoading } from "../stores/labState";
-import { historyState, rememberSearch } from "../stores/historyState";
-import BlogPreviewCard from "../components/BlogPreviewCard.vue";
-import ShopPreviewCard from "../components/ShopPreviewCard.vue";
+import { isAuthenticated, sessionState } from "../stores/session";
 
 const router = useRouter();
-const keyword = ref("");
-const loadMoreRef = ref(null);
-let observer;
 
-const featuredTypes = computed(() =>
-  homeFeedState.shopTypes.value.slice(0, 10),
+const moduleCards = [
+  {
+    title: "用户中心",
+    path: "/me",
+    description: "管理当前用户、签到、昵称修改和退出登录。",
+  },
+  {
+    title: "商铺管理",
+    path: "/shop",
+    description: "使用统一筛选区、表格区和分页区查询商铺与详情。",
+  },
+  {
+    title: "笔记管理",
+    path: "/blog",
+    description: "按标签页集中处理发布、热门、个人笔记和详情。",
+  },
+  {
+    title: "关注关系",
+    path: "/follow",
+    description: "查看关注状态、共同关注和关注流。",
+  },
+  {
+    title: "优惠券管理",
+    path: "/voucher",
+    description: "查询店铺券、创建普通券和秒杀券。",
+  },
+  {
+    title: "图片上传",
+    path: "/upload",
+    description: "统一上传、预览和删除博客图片。",
+  },
+];
+
+const rescueSteps = [
+  "统一布局与路由挂载，只让内容区切换。",
+  "统一 Element Plus 表单、表格、弹窗和上传能力。",
+  "保留现有 API 和 store，页面结构全部后台化。",
+  "将复杂页面拆成卡片与标签页，后续新增页面直接复用。",
+];
+
+const backendFacts = [
+  "用户、商铺、分类、笔记、关注、优惠券、秒杀、上传接口都已可用。",
+  "评论接口仍未纳入本次改造范围，避免扩大施工面。",
+  "当前路由只承载 new_pages，旧 pages 保留参考但不参与运行。",
+];
+
+const sessionText = computed(() =>
+  isAuthenticated()
+    ? `当前登录用户：${sessionState.currentUser.value?.nickName || "已持有 token"}`
+    : "当前未登录，先去登录页获取 token。",
 );
-const quickKeywords = computed(() =>
-  [
-    ...homeFeedState.shopTypes.value.slice(0, 4).map((item) => item.name),
-    ...historyState.recentSearches.value.slice(0, 4),
-  ]
-    .filter((value, index, source) => value && source.indexOf(value) === index)
-    .slice(0, 6),
-);
-
-async function ensureTypes() {
-  if (homeFeedState.shopTypes.value.length) {
-    return;
-  }
-
-  const { data, success } = await shopApi.fetchTypes({ silentError: true });
-  if (success) {
-    homeFeedState.shopTypes.value = Array.isArray(data) ? data : [];
-  }
-}
-
-async function loadHotBlogs(reset = false) {
-  if (isLoading("GET /blog/hot")) {
-    return;
-  }
-
-  if (reset) {
-    homeFeedState.currentPage.value = 1;
-    homeFeedState.hasMore.value = true;
-    homeFeedState.hotBlogs.value = [];
-  }
-
-  if (!homeFeedState.hasMore.value) {
-    return;
-  }
-
-  const { data, success } = await blogApi.fetchHot(
-    homeFeedState.currentPage.value,
-    {
-      silentError: true,
-    },
-  );
-
-  if (!success) {
-    return;
-  }
-
-  const rows = Array.isArray(data) ? data : [];
-  if (!rows.length) {
-    homeFeedState.hasMore.value = false;
-    return;
-  }
-
-  homeFeedState.hotBlogs.value = [...homeFeedState.hotBlogs.value, ...rows];
-  homeFeedState.currentPage.value += 1;
-}
-
-function submitSearch() {
-  if (!keyword.value.trim()) {
-    setNotice("info", "请输入商户名或地点关键词。");
-    return;
-  }
-  rememberSearch(keyword.value);
-  router.push({
-    name: "shop-list",
-    params: { typeId: "all" },
-    query: { keyword: keyword.value.trim() },
-  });
-}
-
-function searchByKeyword(value) {
-  keyword.value = value;
-  submitSearch();
-}
-
-function openType(type) {
-  router.push({
-    name: "shop-list",
-    params: { typeId: String(type.id) },
-    query: { name: type.name },
-  });
-}
-
-onMounted(async () => {
-  await Promise.all([ensureTypes(), loadHotBlogs(true)]);
-  homeFeedState.initialized.value = true;
-
-  if ("IntersectionObserver" in window && loadMoreRef.value) {
-    observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          loadHotBlogs();
-        }
-      },
-      { rootMargin: "120px" },
-    );
-    observer.observe(loadMoreRef.value);
-  }
-});
-
-onBeforeUnmount(() => observer?.disconnect());
 </script>
 
 <template>
-  <section class="consumer-page home-page">
-    <section
-      class="hero-card ue-wave-bg ue-washi ue-shadow ukiyo-e-digital-accent-corner"
-    >
-      <div class="hero-copy">
-        <p class="eyebrow">Home</p>
-        <h1>浮世绘版黑马点评主站</h1>
-        <p class="hero-text">
-          交互逻辑切换成原型里的消费链路：首页先看分类与热门笔记，随后进入商铺、秒杀、关注和发笔记。
-        </p>
-      </div>
+  <section class="app-page">
+    <ElCard class="page-panel">
+      <template #header>
+        <div class="page-panel__header">
+          <div>
+            <h2 class="page-panel__title">new_pages 后台化总览</h2>
+            <p class="page-panel__hint">
+              所有页面已收敛到统一布局、统一风格、统一组件体系。
+            </p>
+          </div>
+          <ElTag type="primary" effect="plain">Element Plus Ready</ElTag>
+        </div>
+      </template>
 
-      <div class="consumer-search-bar">
-        <input
-          v-model="keyword"
-          placeholder="请输入商户名、地点或商圈"
-          @keyup.enter="submitSearch"
-        />
-        <button class="accent" @click="submitSearch">搜索商铺</button>
+      <div class="stats-grid">
+        <ElCard shadow="never" class="stat-card">
+          <span class="stat-card__label">当前会话</span>
+          <p class="stat-card__value">{{ isAuthenticated() ? "已登录" : "未登录" }}</p>
+          <p class="stat-card__desc">{{ sessionText }}</p>
+        </ElCard>
+        <ElCard shadow="never" class="stat-card">
+          <span class="stat-card__label">页面数量</span>
+          <p class="stat-card__value">9</p>
+          <p class="stat-card__desc">Home、Login、Me、Shop、Blog、Follow、Voucher、Upload、BlogEditor。</p>
+        </ElCard>
+        <ElCard shadow="never" class="stat-card">
+          <span class="stat-card__label">统一壳子</span>
+          <p class="stat-card__value">2 套</p>
+          <p class="stat-card__desc">业务页走 MainLayout，登录页走 BlankLayout。</p>
+        </ElCard>
+        <ElCard shadow="never" class="stat-card">
+          <span class="stat-card__label">视觉基线</span>
+          <p class="stat-card__value">黑白灰蓝</p>
+          <p class="stat-card__desc">白底、黑字、灰线、蓝色激活态，适合长期维护。</p>
+        </ElCard>
       </div>
+    </ElCard>
 
-      <div class="consumer-inline-type-list">
-        <button
-          v-for="item in quickKeywords"
-          :key="item"
-          class="secondary"
-          @click="searchByKeyword(item)"
+    <div class="page-grid-2">
+      <ElCard class="page-panel">
+        <template #header>
+          <div class="page-panel__header">
+            <div>
+              <h3 class="page-panel__title">改造顺序</h3>
+              <p class="page-panel__hint">按风险和依赖顺序推进。</p>
+            </div>
+          </div>
+        </template>
+        <ElTimeline>
+          <ElTimelineItem
+            v-for="step in rescueSteps"
+            :key="step"
+            type="primary"
+            hollow
+          >
+            {{ step }}
+          </ElTimelineItem>
+        </ElTimeline>
+      </ElCard>
+
+      <ElCard class="page-panel">
+        <template #header>
+          <div class="page-panel__header">
+            <div>
+              <h3 class="page-panel__title">后端边界</h3>
+              <p class="page-panel__hint">页面改造不改 API 契约。</p>
+            </div>
+          </div>
+        </template>
+        <ElSpace direction="vertical" fill size="large">
+          <ElAlert
+            v-for="fact in backendFacts"
+            :key="fact"
+            :title="fact"
+            type="info"
+            :closable="false"
+            show-icon
+          />
+        </ElSpace>
+      </ElCard>
+    </div>
+
+    <ElCard class="page-panel">
+      <template #header>
+        <div class="page-panel__header">
+          <div>
+            <h3 class="page-panel__title">模块入口</h3>
+            <p class="page-panel__hint">后续新增页面直接挂到统一路由和统一壳子中。</p>
+          </div>
+        </div>
+      </template>
+
+      <div class="page-grid-3">
+        <ElCard
+          v-for="item in moduleCards"
+          :key="item.path"
+          shadow="hover"
+          class="module-card"
+          @click="router.push(item.path)"
         >
-          {{ item }}
-        </button>
+          <template #header>
+            <div class="page-panel__header">
+              <div>
+                <h4 class="page-panel__title">{{ item.title }}</h4>
+                <p class="page-panel__hint">{{ item.path }}</p>
+              </div>
+              <ElTag effect="plain">模块页</ElTag>
+            </div>
+          </template>
+          <p class="stat-card__desc">{{ item.description }}</p>
+          <div class="page-actions" style="margin-top: 16px;">
+            <ElButton type="primary" plain @click.stop="router.push(item.path)">
+              打开页面
+            </ElButton>
+          </div>
+        </ElCard>
       </div>
-
-      <div class="hero-grid">
-        <div class="info-card ukiyo-e-digital-card">
-          <span class="label">会话</span>
-          <strong>{{
-            sessionState.currentUser.value?.nickName || "游客"
-          }}</strong>
-          <small>{{
-            sessionState.token.value
-              ? "已登录，可操作完整链路"
-              : "公开链路可直接浏览"
-          }}</small>
-        </div>
-        <div class="info-card ukiyo-e-digital-card">
-          <span class="label">分类</span>
-          <strong>{{ homeFeedState.shopTypes.value.length }}</strong>
-          <small>点击分类进入商铺列表</small>
-        </div>
-        <div class="info-card ukiyo-e-digital-card">
-          <span class="label">热门笔记</span>
-          <strong>{{ homeFeedState.hotBlogs.value.length }}</strong>
-          <small>下拉自动续载更多内容</small>
-        </div>
-      </div>
-    </section>
-
-    <section
-      v-if="historyState.recentShops.value.length"
-      class="module-section"
-    >
-      <div class="section-title">
-        <div>
-          <p class="eyebrow">Resume</p>
-          <h2>继续浏览</h2>
-        </div>
-        <span class="section-hint">保留最近看过的店铺，减少重复搜索</span>
-      </div>
-
-      <div class="shop-feed-grid">
-        <ShopPreviewCard
-          v-for="shop in historyState.recentShops.value.slice(0, 2)"
-          :key="shop.id"
-          :shop="shop"
-        />
-      </div>
-    </section>
-
-    <section class="module-section">
-      <div class="section-title">
-        <div>
-          <p class="eyebrow">Categories</p>
-          <h2>商铺分类入口</h2>
-        </div>
-        <span class="section-hint">保留黑马点评首页先选分类的操作习惯</span>
-      </div>
-
-      <div class="consumer-type-grid">
-        <button
-          v-for="type in featuredTypes"
-          :key="type.id"
-          class="type-chip consumer-type-chip"
-          @click="openType(type)"
-        >
-          <img :src="toAssetUrl(type.icon)" :alt="type.name" />
-          <span>{{ type.name }}</span>
-        </button>
-      </div>
-    </section>
-
-    <section class="module-section">
-      <div class="section-title">
-        <div>
-          <p class="eyebrow">Trending</p>
-          <h2>热门笔记流</h2>
-        </div>
-        <span class="section-hint"
-          >点击卡片进入详情，可进一步点赞、关注作者、查看关联商铺</span
-        >
-      </div>
-
-      <div class="blog-feed-grid">
-        <BlogPreviewCard
-          v-for="blog in homeFeedState.hotBlogs.value"
-          :key="blog.id"
-          :blog="blog"
-        />
-      </div>
-
-      <div ref="loadMoreRef" class="feed-sentinel">
-        <span v-if="isLoading('GET /blog/hot')" class="helper"
-          >正在续载更多热门笔记...</span
-        >
-        <span v-else-if="!homeFeedState.hasMore.value" class="helper"
-          >热门流已经到底了。</span
-        >
-      </div>
-    </section>
+    </ElCard>
   </section>
 </template>

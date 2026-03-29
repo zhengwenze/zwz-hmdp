@@ -1,0 +1,74 @@
+:root {
+  --el-color-primary: var(--app-primary);
+  --el-color-primary-light-3: #5b8ef0;
+  --el-color-primary-light-5: #8ab2f5;
+  --el-color-primary-light-7: #bed7fb;
+  --el-color-primary-light-8: #dbeafe;
+  --el-color-primary-light-9: #eff6ff;
+  --el-color-primary-dark-2: #1d4ed8;
+  --el-bg-color: var(--app-surface);
+  --el-bg-color-page: var(--app-bg);
+  --el-text-color-primary: var(--app-text);
+  --el-text-color-regular: var(--app-text-secondary);
+  --el-text-color-secondary: var(--app-text-muted);
+  --el-border-color: var(--app-border);
+  --el-border-color-light: #e5eaf1;
+  --el-border-radius-base: var(--app-radius-sm);
+  --el-border-radius-small: 6px;
+  --el-border-radius-round: 999px;
+  --el-box-shadow-light: var(--app-shadow-sm);
+  --el-box-shadow: var(--app-shadow-md);
+  --el-fill-color-light: #f8fafc;
+  --el-fill-color-blank: #ffffff;
+}
+
+.el-card {
+  border-radius: var(--app-radius-md);
+}
+
+.el-card.is-always-shadow,
+.el-card.is-hover-shadow:hover {
+  box-shadow: var(--app-shadow-sm);
+}
+
+.el-button {
+  font-weight: 600;
+}
+
+.el-button--default {
+  border-color: var(--app-border);
+}
+
+.el-button--info {
+  --el-button-bg-color: #ffffff;
+  --el-button-text-color: var(--app-text-secondary);
+  --el-button-border-color: var(--app-border);
+}
+
+.el-button--success.is-plain,
+.el-button--primary.is-plain,
+.el-button--info.is-plain {
+  background-color: #ffffff;
+}
+
+.el-menu {
+  border-right: none;
+}
+
+.el-menu-item {
+  border-radius: 10px;
+  margin-bottom: 6px;
+}
+
+.el-menu-item.is-active {
+  background-color: rgba(37, 99, 235, 0.14);
+}
+
+.el-table {
+  --el-table-header-bg-color: #f8fafc;
+  --el-table-row-hover-bg-color: #f8fbff;
+}
+
+.el-tabs__item {
+  font-weight: 600;
+}

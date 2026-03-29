@@ -1,44 +1,42 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
-import { sessionState, clearSession } from "../stores/session";
-import { blogFlowState } from "../stores/blogFlow";
+import { useRouter } from "vue-router";
 import { userApi } from "../services/userApi";
-import { blogApi } from "../services/blogApi";
-import { formatDateTime } from "../utils/view";
-import { historyState } from "../stores/historyState";
-import BlogPreviewCard from "../components/BlogPreviewCard.vue";
+import {
+  buildRedirectPath,
+  clearSession,
+  isAuthenticated,
+  sessionState,
+} from "../stores/session";
 
 const router = useRouter();
-const activeTab = ref("notes");
 const userInfo = ref(null);
 const signCount = ref("--");
-const showNicknameEditor = ref(false);
+const nicknameDialogVisible = ref(false);
 const newNickname = ref("");
 
-const followFeedCards = computed(() => blogFlowState.followFeed.value);
+const userId = computed(() => sessionState.currentUser.value?.id);
 
 async function loadMe() {
-  const meResult = await userApi.fetchMe({ silentError: true });
-  if (meResult.success) {
-    sessionState.currentUser.value = meResult.data || null;
-  }
-
-  if (!sessionState.currentUser.value?.id) {
+  if (!isAuthenticated()) {
+    userInfo.value = null;
+    signCount.value = "--";
+    sessionState.currentUser.value = null;
     return;
   }
 
+  const meResult = await userApi.fetchMe({ silentError: true });
+  if (!meResult.success || !meResult.data?.id) {
+    return;
+  }
+
+  sessionState.currentUser.value = meResult.data;
+
   await Promise.all([
-    userApi.fetchUserInfo(sessionState.currentUser.value.id, {
+    userApi.fetchUserInfo(meResult.data.id, {
       silentError: true,
       onSuccess: (data) => {
         userInfo.value = data || null;
-      },
-    }),
-    blogApi.fetchMy(1, {
-      silentError: true,
-      onSuccess: (data) => {
-        blogFlowState.myBlogs.value = Array.isArray(data) ? data : [];
       },
     }),
     userApi.fetchSignCount({
@@ -50,49 +48,35 @@ async function loadMe() {
   ]);
 }
 
-async function loadFollowFeed(reset = false) {
-  if (reset) {
-    blogFlowState.followFeed.value = [];
-    blogFlowState.followCursor.minTime = String(Date.now());
-    blogFlowState.followCursor.offset = 0;
-    blogFlowState.followCursor.hasMore = true;
-  }
-
-  const { data, success } = await blogApi.fetchFollowFeed(
-    blogFlowState.followCursor.minTime,
-    blogFlowState.followCursor.offset,
-    { silentError: true },
-  );
-
-  if (!success || !data?.list?.length) {
-    blogFlowState.followCursor.hasMore = false;
-    return;
-  }
-
-  blogFlowState.followFeed.value = [...blogFlowState.followFeed.value, ...data.list];
-  blogFlowState.followCursor.minTime = String(data.minTime);
-  blogFlowState.followCursor.offset = Number(data.offset || 0);
+function jumpToLogin() {
+  router.push(buildRedirectPath("/me"));
 }
 
 async function signToday() {
-  await userApi.sign({ successMessage: "签到成功。" });
-  await loadMe();
-}
-
-function handleLogout() {
-  clearSession("本地登录态已清空。");
-  router.push("/");
+  if (!isAuthenticated()) {
+    jumpToLogin();
+    return;
+  }
+  const { success } = await userApi.sign({ successMessage: "签到成功。" });
+  if (success) {
+    await loadMe();
+  }
 }
 
 function openNicknameEditor() {
   newNickname.value = sessionState.currentUser.value?.nickName || "";
-  showNicknameEditor.value = true;
+  nicknameDialogVisible.value = true;
 }
 
 async function submitNicknameUpdate() {
+  if (!isAuthenticated()) {
+    jumpToLogin();
+    return;
+  }
   if (!newNickname.value.trim()) {
     return;
   }
+
   const { success } = await userApi.updateNickName(newNickname.value.trim(), {
     successMessage: "昵称修改成功。",
   });
@@ -101,126 +85,121 @@ async function submitNicknameUpdate() {
       ...sessionState.currentUser.value,
       nickName: newNickname.value.trim(),
     };
-    showNicknameEditor.value = false;
+    nicknameDialogVisible.value = false;
+    await loadMe();
   }
 }
 
-function cancelNicknameEdit() {
-  showNicknameEditor.value = false;
-  newNickname.value = "";
+async function handleLogout() {
+  await userApi.logout({ silentError: true });
+  clearSession("已退出登录。");
+  userInfo.value = null;
+  signCount.value = "--";
+  router.push("/login");
 }
 
 onMounted(loadMe);
 </script>
 
 <template>
-  <section class="consumer-page">
-    <article class="panel ue-washi ue-shadow">
-      <div class="panel-head">
-        <h2>{{ sessionState.currentUser.value?.nickName || "我的主页" }}</h2>
-        <button class="secondary" @click="loadMe">刷新主页</button>
-        <button class="accent" @click="openNicknameEditor">修改昵称</button>
-      </div>
-
-      <div v-if="showNicknameEditor" class="nickname-editor">
-        <input
-          v-model="newNickname"
-          type="text"
-          placeholder="请输入新昵称"
-          maxlength="32"
-          @keyup.enter="submitNicknameUpdate"
-        />
-        <div class="button-row wrap">
-          <button class="accent" @click="submitNicknameUpdate">保存</button>
-          <button class="secondary" @click="cancelNicknameEdit">取消</button>
+  <section class="app-page">
+    <ElCard class="page-panel">
+      <template #header>
+        <div class="page-panel__header">
+          <div>
+            <h2 class="page-panel__title">当前用户</h2>
+            <p class="page-panel__hint">
+              用户模块只负责当前会话、签到、昵称修改和退出登录。
+            </p>
+          </div>
+          <div class="page-actions">
+            <ElButton @click="loadMe">刷新</ElButton>
+            <ElButton v-if="!isAuthenticated()" type="primary" @click="jumpToLogin">
+              去登录
+            </ElButton>
+            <template v-else>
+              <ElButton type="primary" @click="signToday">今日签到</ElButton>
+              <ElButton type="info" plain @click="openNicknameEditor">
+                修改昵称
+              </ElButton>
+              <ElButton type="info" plain @click="handleLogout">退出登录</ElButton>
+            </template>
+          </div>
         </div>
-      </div>
+      </template>
 
-      <div class="shop-detail-meta">
-        <div>
-          <span class="label">简介</span>
-          <strong>{{ userInfo?.introduce || "这个人很懒，还没有留下简介。" }}</strong>
+      <ElEmpty
+        v-if="!isAuthenticated()"
+        description="当前未登录，请先登录后再查看用户信息。"
+      />
+
+      <ElDescriptions v-else :column="2" border>
+        <ElDescriptionsItem label="用户 ID">
+          {{ userId ?? "--" }}
+        </ElDescriptionsItem>
+        <ElDescriptionsItem label="昵称">
+          {{ sessionState.currentUser.value?.nickName || "--" }}
+        </ElDescriptionsItem>
+        <ElDescriptionsItem label="手机号">
+          {{ sessionState.currentUser.value?.phone || "--" }}
+        </ElDescriptionsItem>
+        <ElDescriptionsItem label="连续签到">
+          {{ signCount }}
+        </ElDescriptionsItem>
+      </ElDescriptions>
+    </ElCard>
+
+    <ElCard class="page-panel">
+      <template #header>
+        <div class="page-panel__header">
+          <div>
+            <h3 class="page-panel__title">用户详情</h3>
+            <p class="page-panel__hint">来自 `/user/info/{id}` 的扩展信息。</p>
+          </div>
         </div>
-        <div>
-          <span class="label">粉丝</span>
-          <strong>{{ userInfo?.fans ?? 0 }}</strong>
+      </template>
+
+      <ElDescriptions v-if="userInfo" :column="2" border>
+        <ElDescriptionsItem label="简介">
+          {{ userInfo?.introduce || "暂无简介" }}
+        </ElDescriptionsItem>
+        <ElDescriptionsItem label="性别">
+          {{ userInfo?.gender ?? "未填写" }}
+        </ElDescriptionsItem>
+        <ElDescriptionsItem label="粉丝">
+          {{ userInfo?.fans ?? 0 }}
+        </ElDescriptionsItem>
+        <ElDescriptionsItem label="关注">
+          {{ userInfo?.followee ?? 0 }}
+        </ElDescriptionsItem>
+      </ElDescriptions>
+      <ElEmpty v-else description="暂无用户详情数据。" />
+    </ElCard>
+
+    <ElDialog
+      v-model="nicknameDialogVisible"
+      title="修改昵称"
+      width="420px"
+    >
+      <ElForm label-position="top">
+        <ElFormItem label="新昵称">
+          <ElInput
+            v-model="newNickname"
+            maxlength="32"
+            placeholder="请输入新昵称"
+            @keyup.enter="submitNicknameUpdate"
+          />
+        </ElFormItem>
+      </ElForm>
+
+      <template #footer>
+        <div class="page-actions">
+          <ElButton @click="nicknameDialogVisible = false">取消</ElButton>
+          <ElButton type="primary" @click="submitNicknameUpdate">
+            保存昵称
+          </ElButton>
         </div>
-        <div>
-          <span class="label">关注</span>
-          <strong>{{ userInfo?.followee ?? 0 }}</strong>
-        </div>
-        <div>
-          <span class="label">连续签到</span>
-          <strong>{{ signCount }}</strong>
-        </div>
-      </div>
-
-      <div class="button-row wrap">
-        <RouterLink to="/blog/new" class="link-button">去发笔记</RouterLink>
-        <button @click="signToday">今日签到</button>
-        <button class="secondary" @click="handleLogout">退出登录</button>
-      </div>
-    </article>
-
-    <article v-if="historyState.recentShops.value.length" class="panel ue-washi ue-shadow">
-      <div class="panel-head">
-        <h3>最近逛过</h3>
-        <span class="status-pill muted">减少重复搜索</span>
-      </div>
-      <div class="history-chip-list">
-        <RouterLink
-          v-for="shop in historyState.recentShops.value.slice(0, 5)"
-          :key="shop.id"
-          :to="`/shop/${shop.id}`"
-          class="history-chip"
-        >
-          {{ shop.name }}
-        </RouterLink>
-      </div>
-    </article>
-
-    <article class="panel ue-washi ue-shadow">
-      <div class="consumer-tab-strip">
-        <button
-          :class="activeTab === 'notes' ? 'accent' : 'secondary'"
-          @click="activeTab = 'notes'"
-        >
-          我的笔记
-        </button>
-        <button
-          :class="activeTab === 'feed' ? 'accent' : 'secondary'"
-          @click="activeTab = 'feed'; loadFollowFeed(true)"
-        >
-          关注动态
-        </button>
-      </div>
-
-      <div v-if="activeTab === 'notes'" class="blog-feed-grid">
-        <BlogPreviewCard
-          v-for="blog in blogFlowState.myBlogs.value"
-          :key="blog.id"
-          :blog="blog"
-          :show-author="false"
-        />
-      </div>
-
-      <div v-else class="blog-feed-grid">
-        <BlogPreviewCard
-          v-for="blog in followFeedCards"
-          :key="`${blog.id}-${formatDateTime(blog.createTime)}`"
-          :blog="blog"
-        />
-        <div class="button-row wrap">
-          <button
-            v-if="blogFlowState.followCursor.hasMore"
-            class="secondary"
-            @click="loadFollowFeed()"
-          >
-            继续拉取关注流
-          </button>
-          <span v-else class="helper">关注流已经到底了。</span>
-        </div>
-      </div>
-    </article>
+      </template>
+    </ElDialog>
   </section>
 </template>

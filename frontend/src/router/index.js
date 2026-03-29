@@ -1,37 +1,15 @@
 import { createRouter, createWebHashHistory } from "vue-router";
-import ConsumerShell from "../layout/ConsumerShell.vue";
-import AppShell from "../layout/AppShell.vue";
-import HeroPage from "../pages/HeroPage.vue";
-import LoginPage from "../pages/LoginPage.vue";
-import UserPage from "../pages/UserPage.vue";
-import ShopTypesPage from "../pages/ShopTypesPage.vue";
-import ShopsPage from "../pages/ShopsPage.vue";
-import BlogsPage from "../pages/BlogsPage.vue";
-import FollowPage from "../pages/FollowPage.vue";
-import VouchersPage from "../pages/VouchersPage.vue";
-import UploadPage from "../pages/UploadPage.vue";
-import LogsPage from "../pages/LogsPage.vue";
+import MainLayout from "../layout/MainLayout.vue";
+import BlankLayout from "../layout/BlankLayout.vue";
 import HomePage from "../new_pages/HomePage.vue";
-import ShopListPage from "../pages/ShopListPage.vue";
-import ShopDetailPage from "../pages/ShopDetailPage.vue";
-import BlogDetailPage from "../pages/BlogDetailPage.vue";
-import BlogEditorPage from "../new_pages/BlogEditorPage.vue";
+import LoginPage from "../new_pages/LoginPage.vue";
 import MePage from "../new_pages/MePage.vue";
-import UserProfilePage from "../pages/UserProfilePage.vue";
-import { moduleMeta } from "../config/moduleMeta";
-import { buildRedirectPath, isAuthenticated } from "../stores/session";
-
-const pageComponents = {
-  hero: HeroPage,
-  user: UserPage,
-  "shop-types": ShopTypesPage,
-  shops: ShopsPage,
-  blogs: BlogsPage,
-  follow: FollowPage,
-  vouchers: VouchersPage,
-  upload: UploadPage,
-  logs: LogsPage,
-};
+import ShopPage from "../new_pages/ShopPage.vue";
+import BlogPage from "../new_pages/BlogPage.vue";
+import FollowPage from "../new_pages/FollowPage.vue";
+import VoucherPage from "../new_pages/VoucherPage.vue";
+import UploadPage from "../new_pages/UploadPage.vue";
+import BlogEditorPage from "../new_pages/BlogEditorPage.vue";
 
 const routes = [
   {
@@ -40,39 +18,30 @@ const routes = [
   },
   {
     path: "/login",
-    name: "login",
-    component: LoginPage,
+    component: BlankLayout,
+    children: [
+      {
+        path: "",
+        name: "login",
+        component: LoginPage,
+        meta: {
+          title: "登录",
+        },
+      },
+    ],
   },
   {
     path: "/",
-    component: ConsumerShell,
+    component: MainLayout,
     children: [
       {
         path: "",
         name: "home",
         component: HomePage,
-      },
-      {
-        path: "shop-list/:typeId",
-        name: "shop-list",
-        component: ShopListPage,
-      },
-      {
-        path: "shop/:id",
-        name: "shop-detail",
-        component: ShopDetailPage,
-      },
-      {
-        path: "blog/:id",
-        name: "blog-detail",
-        component: BlogDetailPage,
-      },
-      {
-        path: "blog/new",
-        name: "blog-new",
-        component: BlogEditorPage,
         meta: {
-          requiresAuth: true,
+          title: "工作台",
+          description: "查看模块入口、当前会话与改造后的页面体系。",
+          menu: true,
         },
       },
       {
@@ -80,28 +49,76 @@ const routes = [
         name: "me",
         component: MePage,
         meta: {
-          requiresAuth: true,
+          title: "用户中心",
+          description: "管理当前登录用户、签到、昵称修改和登出。",
+          menu: true,
         },
       },
       {
-        path: "user/:id",
-        name: "user-profile",
-        component: UserProfilePage,
+        path: "shop",
+        name: "shop",
+        component: ShopPage,
+        meta: {
+          title: "商铺管理",
+          description: "统一以筛选区、表格区和分页区承载商铺查询。",
+          menu: true,
+        },
+      },
+      {
+        path: "blog",
+        name: "blog",
+        component: BlogPage,
+        meta: {
+          title: "笔记管理",
+          description: "集中管理发布、热门、个人笔记和详情查询。",
+          menu: true,
+        },
+      },
+      {
+        path: "blog/editor",
+        name: "blog-editor",
+        component: BlogEditorPage,
+        meta: {
+          title: "发布笔记",
+          description: "使用标准表单、上传和选店对话框完成笔记发布。",
+          hidden: true,
+        },
+      },
+      {
+        path: "follow",
+        name: "follow",
+        component: FollowPage,
+        meta: {
+          title: "关注关系",
+          description: "查看关注状态、共同关注和关注流。",
+          menu: true,
+        },
+      },
+      {
+        path: "voucher",
+        name: "voucher",
+        component: VoucherPage,
+        meta: {
+          title: "优惠券管理",
+          description: "查询店铺券、创建普通券和秒杀券。",
+          menu: true,
+        },
+      },
+      {
+        path: "upload",
+        name: "upload",
+        component: UploadPage,
+        meta: {
+          title: "图片上传",
+          description: "统一管理博客图片上传、预览和删除。",
+          menu: true,
+        },
       },
     ],
   },
   {
-    path: "/lab",
-    component: AppShell,
-    children: moduleMeta.map((item) => ({
-      path: item.routePath,
-      name: `lab-${item.id}`,
-      component: pageComponents[item.id],
-      meta: {
-        title: item.title,
-        description: item.description,
-      },
-    })),
+    path: "/:pathMatch(.*)*",
+    redirect: "/",
   },
 ];
 
@@ -110,11 +127,8 @@ const router = createRouter({
   routes,
 });
 
-router.beforeEach((to) => {
-  if (to.meta.requiresAuth && !isAuthenticated()) {
-    return buildRedirectPath(to.fullPath);
-  }
-  return true;
+router.afterEach((to) => {
+  document.title = to.meta?.title ? `${to.meta.title} - HMDP` : "HMDP";
 });
 
 export default router;
