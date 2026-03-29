@@ -1,6 +1,7 @@
 # 高并发电商秒杀平台
 
 <!-- badges -->
+
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-2.7.4-green?style=flat-square&logo=springboot)](https://spring.io/projects/spring-boot)
 [![Vue 3](https://img.shields.io/badge/Vue-3-blue?style=flat-square&logo=vuedotjs)](https://vuejs.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-blue?style=flat-square&logo=mysql)](https://www.mysql.com/)
@@ -28,26 +29,26 @@
 
 ### 后端
 
-| 分类 | 技术 | 说明 |
-|------|------|------|
-| 框架 | Spring Boot 2.7.4 / Spring MVC | 核心 Web 框架 |
-| ORM | MyBatis Plus 3.5.2 | CRUD 与分页 |
-| 数据库 | MySQL 8.0 | 持久化存储 |
-| 缓存 | Redis 7 + Spring Data Redis | 缓存、分布式锁、Stream、Geo |
-| 分布式锁 | Redisson 3.17.7 | 可靠分布式锁实现 |
-| 工具 | Hutool 5.8.8 / Lombok | 工具库 |
-| 构建 | Maven | 依赖管理 |
+| 分类     | 技术                           | 说明                        |
+| -------- | ------------------------------ | --------------------------- |
+| 框架     | Spring Boot 2.7.4 / Spring MVC | 核心 Web 框架               |
+| ORM      | MyBatis Plus 3.5.2             | CRUD 与分页                 |
+| 数据库   | MySQL 8.0                      | 持久化存储                  |
+| 缓存     | Redis 7 + Spring Data Redis    | 缓存、分布式锁、Stream、Geo |
+| 分布式锁 | Redisson 3.17.7                | 可靠分布式锁实现            |
+| 工具     | Hutool 5.8.8 / Lombok          | 工具库                      |
+| 构建     | Maven                          | 依赖管理                    |
 
 ### 前端
 
-| 分类 | 技术 | 说明 |
-|------|------|------|
-| 框架 | Vue 3 (Composition API) | 响应式 UI |
-| 构建 | Vite 8 | 快速构建工具 |
-| 路由 | Vue Router 5 | SPA 路由管理 |
-| 状态 | Pinia 3 | 统一状态管理 |
-| UI | Element Plus 2.13 | UI 组件库 |
-| 网络 | Axios | HTTP 客户端 |
+| 分类     | 技术                                           | 说明           |
+| -------- | ---------------------------------------------- | -------------- |
+| 框架     | Vue 3 (Composition API)                        | 响应式 UI      |
+| 构建     | Vite 8                                         | 快速构建工具   |
+| 路由     | Vue Router 5                                   | SPA 路由管理   |
+| 状态     | Pinia 3                                        | 统一状态管理   |
+| UI       | Element Plus 2.13                              | UI 组件库      |
+| 网络     | Axios                                          | HTTP 客户端    |
 | 自动导入 | unplugin-auto-import / unplugin-vue-components | 零配置按需引入 |
 
 ### 部署
@@ -58,15 +59,15 @@ Docker · Docker Compose · Nginx · 多阶段镜像构建
 
 ## 功能模块
 
-| 模块 | 功能 |
-|------|------|
-| **用户** | 登录、登出、签到、用户信息查询 |
-| **商铺** | 分类列表、商铺详情、商铺列表、附近商铺（Geo） |
-| **博客** | 发布、点赞、详情、个人博客、探店笔记 |
-| **社交** | 关注、粉丝、共同关注、关注流 |
-| **优惠券** | 普通优惠券领取、秒杀优惠券、限时抢购 |
-| **秒杀** | Lua 原子校验、库存扣减、异步下单、Redis Stream 队列消费 |
-| **图片** | 上传、删除 |
+| 模块       | 功能                                                    |
+| ---------- | ------------------------------------------------------- |
+| **用户**   | 登录、登出、签到、用户信息查询                          |
+| **商铺**   | 分类列表、商铺详情、商铺列表、附近商铺（Geo）           |
+| **博客**   | 发布、点赞、详情、个人博客、探店笔记                    |
+| **社交**   | 关注、粉丝、共同关注、关注流                            |
+| **优惠券** | 普通优惠券领取、秒杀优惠券、限时抢购                    |
+| **秒杀**   | Lua 原子校验、库存扣减、异步下单、Redis Stream 队列消费 |
+| **图片**   | 上传、删除                                              |
 
 ---
 
@@ -151,28 +152,28 @@ yarn dev
 
 ### 缓存策略
 
-| 场景 | 策略 |
-|------|------|
-| 商铺分类 | Cache-Aside + 定时刷新 |
+| 场景     | 策略                          |
+| -------- | ----------------------------- |
+| 商铺分类 | Cache-Aside + 定时刷新        |
 | 商铺详情 | 逻辑过期 + 异步重建（防击穿） |
-| 验证码 | 缓存穿透：存空值拦截 |
-| 秒杀库存 | Lua 脚本原子扣减 |
+| 验证码   | 缓存穿透：存空值拦截          |
+| 秒杀库存 | Lua 脚本原子扣减              |
 
 ---
 
 ## API 概览
 
-| 路径 | 说明 |
-|------|------|
-| `POST /user/login` | 用户登录 |
-| `GET /shop/list` | 商铺列表 |
-| `GET /shop/of/nearby` | 附近商铺 |
-| `GET /blog/of/user` | 用户博客 |
-| `POST /blog/like` | 点赞 |
-| `POST /follow` | 关注用户 |
-| `GET /voucher/list` | 优惠券列表 |
-| `POST /voucher-order/seckill` | 秒杀下单 |
-| `POST /upload` | 图片上传 |
+| 路径                          | 说明       |
+| ----------------------------- | ---------- |
+| `POST /user/login`            | 用户登录   |
+| `GET /shop/list`              | 商铺列表   |
+| `GET /shop/of/nearby`         | 附近商铺   |
+| `GET /blog/of/user`           | 用户博客   |
+| `POST /blog/like`             | 点赞       |
+| `POST /follow`                | 关注用户   |
+| `GET /voucher/list`           | 优惠券列表 |
+| `POST /voucher-order/seckill` | 秒杀下单   |
+| `POST /upload`                | 图片上传   |
 
 > 完整接口文档可导入 `backend/db/hmdp.http` 至 IDE 或 Apifox。
 
