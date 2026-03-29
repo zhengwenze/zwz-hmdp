@@ -13,7 +13,7 @@ const authStatus = computed(() =>
 );
 
 const authRoute = computed(() => ({
-  path: "/auth",
+  path: "/login",
   query: {
     redirect: route.fullPath || "/",
   },

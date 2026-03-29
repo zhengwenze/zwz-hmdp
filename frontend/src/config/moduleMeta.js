@@ -2,7 +2,7 @@ export const moduleMeta = [
   {
     id: "hero",
     label: "总览",
-    path: "/",
+    path: "/lab",
     routePath: "",
     title: "系统总览",
     description: "环境配置、登录状态和模块入口。",
@@ -11,7 +11,7 @@ export const moduleMeta = [
   {
     id: "user",
     label: "用户",
-    path: "/user",
+    path: "/lab/user",
     routePath: "user",
     title: "用户模块",
     description: "验证码登录、会话状态、签到和用户信息查询。",
@@ -20,7 +20,7 @@ export const moduleMeta = [
   {
     id: "shop-types",
     label: "分类",
-    path: "/shop-types",
+    path: "/lab/shop-types",
     routePath: "shop-types",
     title: "商铺分类",
     description: "商铺分类列表和图片资源预览。",
@@ -29,7 +29,7 @@ export const moduleMeta = [
   {
     id: "shops",
     label: "商铺",
-    path: "/shops",
+    path: "/lab/shops",
     routePath: "shops",
     title: "商铺模块",
     description: "商铺查询、创建、更新和详情上下文。",
@@ -38,7 +38,7 @@ export const moduleMeta = [
   {
     id: "blogs",
     label: "博客",
-    path: "/blogs",
+    path: "/lab/blogs",
     routePath: "blogs",
     title: "博客模块",
     description: "博客发布、热榜、点赞和关注流。",
@@ -47,7 +47,7 @@ export const moduleMeta = [
   {
     id: "follow",
     label: "关注",
-    path: "/follow",
+    path: "/lab/follow",
     routePath: "follow",
     title: "关注模块",
     description: "关注、关注状态和共同关注查询。",
@@ -56,7 +56,7 @@ export const moduleMeta = [
   {
     id: "vouchers",
     label: "优惠券",
-    path: "/vouchers",
+    path: "/lab/vouchers",
     routePath: "vouchers",
     title: "优惠券与秒杀",
     description: "普通券、秒杀券和秒杀下单。",
@@ -65,7 +65,7 @@ export const moduleMeta = [
   {
     id: "upload",
     label: "上传",
-    path: "/upload",
+    path: "/lab/upload",
     routePath: "upload",
     title: "图片上传",
     description: "博客图片上传、预览和删除。",
@@ -74,7 +74,7 @@ export const moduleMeta = [
   {
     id: "logs",
     label: "诊断",
-    path: "/logs",
+    path: "/lab/logs",
     routePath: "logs",
     title: "接口诊断",
     description: "接口覆盖矩阵、最近响应和请求日志。",
