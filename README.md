@@ -2,7 +2,289 @@
 
 **后端技术栈：** Java、Spring Boot、Spring Data Redis、MyBatis Plus、Redisson、MySQL、Redis、Redis Stream、Lombok、Hutool
 
-**前端技术栈：** Vue、Vite、JS、CSS
+**前端技术栈：** Vue 3、Vue Router、Pinia State、Vite、Axios
+
+**基础设施：** Docker、Docker Compose、Maven
+
+## 前端工程结构
+
+```
+frontend/
+├── src/
+│   ├── api.js                      # Axios 封装、请求/响应拦截器
+│   ├── main.js                     # Vue 应用入口
+│   ├── App.vue                     # 根组件
+│   ├── style.css                   # 全局样式
+│   ├── config/
+│   │   ├── moduleMeta.js           # 模块元数据（路由、标题、描述）
+│   │   └── endpointCatalog.js      # 接口目录与参数定义
+│   ├── stores/
+│   │   └── sharedState.js         # 全局状态（Pinia-like 响应式状态）
+│   ├── layout/
+│   │   └── AppShell.vue           # 布局壳（侧边栏 + 内容区）
+│   ├── pages/                     # 页面组件（按业务模块拆分）
+│   │   ├── HeroPage.vue           # 首页/总览
+│   │   ├── UserPage.vue           # 用户模块
+│   │   ├── ShopTypesPage.vue      # 商铺分类
+│   │   ├── ShopsPage.vue          # 商铺管理
+│   │   ├── BlogsPage.vue          # 博客/探店笔记
+│   │   ├── FollowPage.vue         # 关注关系
+│   │   ├── VouchersPage.vue       # 优惠券与秒杀
+│   │   ├── UploadPage.vue         # 图片上传
+│   │   └── LogsPage.vue           # 接口诊断日志
+│   ├── components/
+│   │   └── SidebarNav.vue         # 侧边导航组件
+│   └── router/
+│       └── index.js               # Vue Router 配置
+├── public/                         # 静态资源
+├── index.html                     # HTML 入口
+├── vite.config.js                 # Vite 构建配置
+└── package.json                   # 依赖管理
+```
+
+---
+
+## 前端架构设计
+
+### 1. 状态管理：sharedState
+
+本项目采用**单一响应式状态对象**模式（类似 Pinia），所有全局状态集中在 `stores/sharedState.js`：
+
+```javascript
+export const sharedState = {
+  token: ref(localStorage.getItem("hmdp-token") || ""), // 登录令牌
+  currentUser: ref(null), // 当前登录用户
+  apiBaseUrl: ref(""), // 后端 API 地址
+  assetBaseUrl: ref(""), // 静态资源地址
+  shopTypes: ref([]), // 商铺分类缓存
+  selectedShop: ref(null), // 当前选中商铺
+  lastResponse: ref(null), // 最近接口响应
+  requestLogs: ref([]), // 请求日志记录
+  notice: reactive({ type: "info", message: "" }), // 全局通知
+  loadingMap: reactive({}), // 加载状态映射
+};
+```
+
+**状态更新模式：** 组件通过导入 `send()` 函数发起请求，回调中更新本地 `ref` 或全局状态。
+
+**持久化策略：** `token`、`apiBaseUrl`、`uploadedImages` 等状态会写入 `localStorage`，页面刷新后自动恢复。
+
+---
+
+### 2. 路由设计：Vue Router
+
+路由配置在 `router/index.js`，采用**嵌套路由 + 动态组件映射**：
+
+```javascript
+const routes = [
+  {
+    path: "/",
+    component: AppShell, // 布局壳
+    children: moduleMeta.map((item) => ({
+      path: item.routePath,
+      name: item.id,
+      component: pageComponents[item.id], // 动态组件
+      meta: { title: item.title, description: item.description },
+    })),
+  },
+];
+```
+
+**模块元数据驱动：** 所有页面信息（路由路径、标题、描述、侧边栏配置）集中在 `config/moduleMeta.js`，路由和侧边栏同步生效，**新增页面只需在 moduleMeta 中添加一条配置**。
+
+**路由特点：**
+
+- 路由-path 与组件名的映射关系由 `moduleMeta` 统一维护
+- 无需手动注册每个路由，`map()` 自动生成完整路由表
+- 每个路由的 `meta` 携带标题和描述，用于侧边栏展示
+
+---
+
+### 3. 接口层封装：api.js
+
+请求封装在 `api.js`，提供统一的 Axios 风格请求逻辑：
+
+**核心函数：**
+
+| 函数                         | 作用                                          |
+| ---------------------------- | --------------------------------------------- |
+| `createApiClient()`          | 创建 API 客户端实例，注入 baseURL 和 token    |
+| `buildUrl()`                 | 拼接 baseURL + path + queryString             |
+| `resolveAssetUrl()`          | 拼接静态资源完整 URL（处理相对路径/绝对路径） |
+| `asNumber()` / `asBoolean()` | 类型转换工具                                  |
+| `cloneWithoutEmpty()`        | 剔除空值字段                                  |
+| `prettify()`                 | JSON 格式化输出                               |
+
+**请求流程：**
+
+```
+组件调用 send(endpointKey, config)
+  ↓
+sharedState.send() 包装一层 loading + 日志 + 错误处理
+  ↓
+apiClient.request() 执行真实请求
+  ↓
+自动注入 authorization header（从 sharedState.token 获取）
+  ↓
+响应拦截：判断 businessSuccess，触发 onSuccess / onError 回调
+```
+
+---
+
+### 4. 组件通信模式
+
+**父→子：Props**
+
+父组件向子组件传递数据：
+
+```javascript
+// 父组件
+const user = ref({ id: 1, name: "测试用户" });
+<ChildComponent :user="user" />
+```
+
+**子→父：Emit / 函数 Prop**
+
+子组件通过 emit 通知父组件，或父组件传递回调函数：
+
+```javascript
+// 方式一：emit
+const emit = defineEmits(["update"]);
+emit("update", newValue);
+
+// 方式二：函数 prop
+const onUpdate = defineProps({ onUpdate: Function });
+props.onUpdate(newValue);
+```
+
+**跨组件：共享状态**
+
+多个组件共享 `sharedState` 中的状态（如 `token`、`currentUser`、`shopTypes`），通过直接读写状态对象实现同步。
+
+---
+
+### 5. 页面还原与数据流转
+
+**页面初始化流程（以 ShopsPage 为例）：**
+
+```
+用户进入 /shops 路由
+  ↓
+AppShell 渲染侧边栏 + ShopsPage
+  ↓
+ShopsPage.onMounted() 或用户操作触发 query 函数
+  ↓
+send("GET /shop/of/type", config, {
+  onSuccess: (data) => { shopsByType.value = data; }
+})
+  ↓
+更新本地 ref 状态
+  ↓
+Vue 自动追踪依赖，模板中 {{ shopsByType }} 实时渲染
+```
+
+**表单提交流程：**
+
+```
+用户填写表单 → 点击提交
+  ↓
+调用 buildShopPayload(forms) 打包表单数据（剔除空值、类型转换）
+  ↓
+send("POST /shop", { body: payload }, {
+  successMessage: "创建成功",
+  onSuccess: () => { 重置表单 / 刷新列表 }
+})
+  ↓
+sharedState.requestLogs.unshift(response) 记录日志
+  ↓
+页面展示成功通知
+```
+
+**数据转换层：** `buildShopPayload()`、`buildBlogPayload()` 等函数负责：
+
+- 剔除用户未填写的空字段
+- 字符串转数字（`asNumber`）
+- 处理 `images` 逗号分隔格式
+- 返回符合后端 DTO 结构的请求体
+
+---
+
+### 6. 前后端联调要点
+
+**Base URL 配置：**
+
+```javascript
+// 默认指向 localhost:8081，可通过页面输入框修改
+sharedState.apiBaseUrl.value = "http://localhost:8081";
+```
+
+**Token 注入：**
+
+```javascript
+// 登录成功后
+sharedState.token.value = response.data;
+localStorage.setItem("hmdp-token", token);
+
+// 后续请求自动带上
+requestHeaders.set("authorization", token);
+```
+
+**鉴权拦截：** 后端返回 401 时，`apiClient.onUnauthorized()` 回调会：
+
+- 清除 `currentUser`
+- 弹出错误通知
+
+**空值与类型处理：**
+
+```javascript
+// 后端返回 null 或 []
+data === null ? [] : data; // 根据接口实际行为选择
+// 逗号分隔字符串转数组
+images.value.split(",").filter(Boolean);
+// 类型转换
+asNumber("123"); // → 123
+```
+
+---
+
+### 7. 页面与组件关系
+
+| 组件                | 职责                                        |
+| ------------------- | ------------------------------------------- |
+| `AppShell.vue`      | 布局容器：侧边栏 + `<router-view>`          |
+| `SidebarNav.vue`    | 导航菜单：根据 moduleMeta 动态渲染菜单项    |
+| `HeroPage.vue`      | 环境配置、登录入口、模块入口展示            |
+| `UserPage.vue`      | 验证码发送、登录/登出、签到、用户信息查询   |
+| `ShopTypesPage.vue` | 分类列表、分类图片预览                      |
+| `ShopsPage.vue`     | 商铺查询（按类型/名称）、商铺创建/更新/详情 |
+| `BlogsPage.vue`     | 博客发布、热榜、点赞、关注流、用户博客      |
+| `FollowPage.vue`    | 关注/取关、共同关注查询                     |
+| `VouchersPage.vue`  | 普通券、秒杀券、秒杀下单                    |
+| `UploadPage.vue`    | 图片上传、预览、删除                        |
+| `LogsPage.vue`      | 接口覆盖矩阵、最近响应、请求日志            |
+
+---
+
+### 8. 请求日志与诊断
+
+`sharedState.requestLogs` 维护最近 40 条请求记录，每条记录包含：
+
+```javascript
+{
+  logId: "1711500000000-abc123",     // 唯一标识
+  endpointKey: "GET /shop/of/type",  // 接口名
+  displayTime: "14:30:25",           // 展示用时间
+  request: { method, url, headers },  // 请求信息
+  response: { status, body },         // 响应信息
+  duration: 125,                      // 耗时 ms
+}
+```
+
+LogsPage 组件以可视化表格展示这些日志，便于：
+
+- 排查接口问题
+- 验证接口覆盖完整性
+- 复现用户操作路径
 
 **基础设施：** Docker、Docker Compose、Maven
 
@@ -722,8 +1004,6 @@ Vue3 前端开发流程，本质上不是“写组件”和“调接口”这么
 在本项目里，前端开发可以概括为一句话：
 
 > 以前端页面为承载，以 Vue3 组件与路由为骨架，以接口与状态管理为数据通道，把后端提供的电商、博客、商铺、秒杀等能力，转化为用户可见、可操作、可反馈的完整产品体验。
-
-如果你是第一次接手这个项目前端，建议先按下面顺序阅读和理解：
 
 1. 看页面和路由入口，理解有哪些主要功能页面
 2. 看接口文档，理解页面依赖哪些后端能力
