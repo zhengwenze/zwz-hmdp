@@ -13,15 +13,81 @@
 
 ---
 
-## 特性亮点
+## 项目亮点
 
-- **异步下单**：Redis Stream 消息队列实现秒杀订单异步处理，流量削峰
-- **Lua 原子操作**：秒杀校验与库存扣减在 Lua 脚本中完成，保证原子性避免超卖
-- **分布式锁**：Redisson 实现可靠分布式锁，保护临界资源
-- **高并发缓存**：多级缓存策略 + 逻辑过期 + 异步重建，防止缓存击穿与穿透
-- **全局 ID**：基于 Redis 的高性能分布式 ID 生成器
-- **GEO 查询**：基于 Redis GEO 实现附近商铺查询
-- **前端状态管理**：Pinia 统一管理全店状态，Vue 3 Composition API
+> 以下每一项均对应项目中的真实实现，而非概念罗列。
+
+### 高并发秒杀核心
+
+| 亮点 | 实现方式 |
+|------|---------|
+| **Lua 原子校验** | `seckill.lua` 在 Redis 端完成库存判断 + 用户防重 + 库存扣减 + Stream 写入，全程原子无锁 |
+| **异步订单队列** | Redis Stream + Consumer Group 实现可靠消息队列，消费者线程独立运行，支持 Pending List 兜底重试 |
+| **全局 ID 生成器** | `RedisIdWorker` 基于时间戳 + 机器 ID + 序列号生成 64 位趋势递增 ID，保证跨节点唯一与分库友好 |
+| **分布式锁** | Redisson + `unlock.lua`，锁持有者才能释放，防止误删他人锁；服务内用 `@Lazy` 自注入解决循环依赖 |
+
+### 高可用缓存体系
+
+| 亮点 | 实现方式 |
+|------|---------|
+| **缓存穿透防护** | `CacheClient.queryWithPassThrough()`：空值写入拦截数据库不存在的请求 |
+| **缓存击穿防护** | `CacheClient.queryWithLogicalExpire()`：逻辑过期 + 互斥锁 + 异步重建，单线程回源 |
+| **附近商铺查询** | `Redis GEO` 命令集实现经纬度存储与距离排序，无需全表扫描 |
+
+### 前端工程化
+
+| 亮点 | 实现方式 |
+|------|---------|
+| **Pinia 统一状态** | 全部 store 收敛到 `defineStore()`，兼容导出保证页面层 import 零改动 |
+| **Element Plus 按需导入** | `unplugin-auto-import` + `unplugin-vue-components` 实现组件与 API 自动导入，零配置 |
+| **Hash 路由** | `createWebHashHistory`，刷新不 404，部署无需服务器配置 fallback |
+
+---
+
+## 技术难点
+
+### 1. 秒杀超卖问题
+
+**问题**：高并发下多个请求同时读到库存 > 0，扣减时全部执行导致超发。
+
+**解法**：将库存校验、扣减、下单写入全部封装进 Lua 脚本，单线程原子执行，Redis 保证即使 10 万并发也只有一条请求能成功扣减到最后一张券。
+
+```lua
+-- seckill.lua 核心逻辑
+if (tonumber(redis.call('get', stockKey)) <= 0) then return 1 end  -- 库存不足
+if (tonumber(redis.call('sismember', orderKey, userId)) == 1) then return 2 end  -- 重复下单
+redis.call('incrby', stockKey, -1)  -- 原子扣减
+redis.call('sadd', orderKey, userId)  -- 写入用户订单集合
+redis.call('xadd', 'stream.orders', '*', ...)  -- 写入消息队别
+```
+
+### 2. 缓存击穿（缓存失效后突发回源）
+
+**问题**：热点数据缓存过期瞬间，所有请求同时穿透到数据库。
+
+**解法**：逻辑过期策略（数据永不过期，但字段记录过期时间），过期后抢互斥锁异步重建缓存，其余请求直接返回旧数据。
+
+```
+请求 → Redis 命中 → 逻辑过期？ → 否（返回旧数据）→ 是（抢锁） → 抢到 → 异步查DB写回 → 释放锁
+```
+
+### 3. 消息队列消费可靠性
+
+**问题**：消费者处理消息时崩溃，已消费的消息未完成下单，导致订单丢失。
+
+**解法**：Redis Stream 的 Pending List（PEL）记录每个消费者已读但未确认的消息，宕机重启后从 PEL 重新读取并处理；配合 XACK 确认机制保证"至少消费一次"。
+
+### 4. 自循环依赖（Spring @Async + @Lazy）
+
+**问题**：`VoucherOrderServiceImpl` 的 `@PostConstruct` 启动消费者线程，消费者线程内部需要调用同service的代理方法做数据库下单，但 Spring Bean 初始化时自注入会触发循环依赖。
+
+**解法**：使用 `@Lazy` 延迟注入自身代理对象，运行时通过代理获取事务生效的方法，而非直接调用内部方法。
+
+### 5. 全局 ID 趋势递增
+
+**问题**：分库分表场景下，UUID 无序导致 MySQL 索引频繁分裂；自增 ID 无法跨节点。
+
+**解法**：Redis 原子递增保证 ID 唯一，结合时间戳确保趋势递增，64 位二进制兼容 Java long 上限。
 
 ---
 
