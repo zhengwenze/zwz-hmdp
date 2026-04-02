@@ -281,4 +281,60 @@ CREATE TABLE `tb_voucher_order`  (
 -- Records of tb_voucher_order
 -- ----------------------------
 
+-- ----------------------------
+-- Table structure for tb_kb_document
+-- ----------------------------
+DROP TABLE IF EXISTS `tb_kb_document`;
+CREATE TABLE `tb_kb_document`  (
+  `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `file_name` varchar(255) NOT NULL COMMENT '文件名',
+  `file_path` varchar(512) NOT NULL COMMENT '文件路径',
+  `file_hash` varchar(64) DEFAULT NULL COMMENT '文件哈希',
+  `status` varchar(32) NOT NULL COMMENT '状态',
+  `chunk_count` int(11) NOT NULL DEFAULT 0 COMMENT '切片数量',
+  `error_msg` varchar(1024) DEFAULT NULL COMMENT '错误信息',
+  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  KEY `idx_tb_kb_document_file_path` (`file_path`) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '知识库文档表' ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for tb_kb_chunk
+-- ----------------------------
+DROP TABLE IF EXISTS `tb_kb_chunk`;
+CREATE TABLE `tb_kb_chunk`  (
+  `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `document_id` bigint(20) UNSIGNED NOT NULL COMMENT '文档id',
+  `chunk_id` varchar(64) NOT NULL COMMENT '切片id',
+  `file_name` varchar(255) NOT NULL COMMENT '文件名',
+  `section` varchar(255) DEFAULT NULL COMMENT '章节',
+  `page_no` int(11) DEFAULT NULL COMMENT '页码',
+  `sort_order` int(11) NOT NULL DEFAULT 0 COMMENT '切片顺序',
+  `content` mediumtext NOT NULL COMMENT '切片内容',
+  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uk_tb_kb_chunk_chunk_id` (`chunk_id`) USING BTREE,
+  KEY `idx_tb_kb_chunk_document_id` (`document_id`) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '知识库切片表' ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for tb_kb_ingest_job
+-- ----------------------------
+DROP TABLE IF EXISTS `tb_kb_ingest_job`;
+CREATE TABLE `tb_kb_ingest_job`  (
+  `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `status` varchar(32) NOT NULL COMMENT '状态',
+  `total_files` int(11) NOT NULL DEFAULT 0 COMMENT '总文件数',
+  `success_files` int(11) NOT NULL DEFAULT 0 COMMENT '成功文件数',
+  `failed_files` int(11) NOT NULL DEFAULT 0 COMMENT '失败文件数',
+  `started_time` timestamp NULL DEFAULT NULL COMMENT '开始时间',
+  `finished_time` timestamp NULL DEFAULT NULL COMMENT '结束时间',
+  `error_msg` varchar(1024) DEFAULT NULL COMMENT '错误信息',
+  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '知识库导入任务表' ROW_FORMAT = Dynamic;
+
 SET FOREIGN_KEY_CHECKS = 1;

@@ -35,6 +35,7 @@ export default defineConfig(({ mode }) => {
         "/voucher-order": target,
         "/upload": target,
         "/blogs": target,
+        "/rag": target,
       },
     },
   };

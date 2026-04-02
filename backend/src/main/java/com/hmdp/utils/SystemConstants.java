@@ -5,6 +5,7 @@ import java.nio.file.Paths;
 
 public class SystemConstants {
     public static final String IMAGE_UPLOAD_DIR = resolveImageUploadDir();
+    public static final String RAG_DOCS_DIR = resolveRagDocsDir();
     public static final String USER_NICK_NAME_PREFIX = "user_";
     public static final int DEFAULT_PAGE_SIZE = 5;
     public static final int MAX_PAGE_SIZE = 10;
@@ -15,5 +16,13 @@ public class SystemConstants {
                 ? Paths.get("data", "hmdp", "imgs")
                 : Paths.get(configuredDir.trim());
         return uploadDir.toAbsolutePath().normalize().toString();
+    }
+
+    private static String resolveRagDocsDir() {
+        String configuredDir = System.getenv("RAG_DOCS_DIR");
+        Path docsDir = configuredDir == null || configuredDir.trim().isEmpty()
+                ? Paths.get("docs", "rag")
+                : Paths.get(configuredDir.trim());
+        return docsDir.toAbsolutePath().normalize().toString();
     }
 }

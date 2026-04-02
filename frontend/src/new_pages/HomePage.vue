@@ -36,6 +36,11 @@ const moduleCards = [
     path: "/upload",
     description: "统一上传、预览和删除博客图片。",
   },
+  {
+    title: "智能客服",
+    path: "/rag",
+    description: "面向文档知识库的 RAG 对话与索引状态管理。",
+  },
 ];
 
 const rescueSteps = [
@@ -47,6 +52,7 @@ const rescueSteps = [
 
 const backendFacts = [
   "用户、商铺、分类、笔记、关注、优惠券、秒杀、上传接口都已可用。",
+  "RAG 客服依赖本地 Ollama 和 Milvus，文档从 docs/rag 目录导入。",
   "评论接口仍未纳入本次改造范围，避免扩大施工面。",
   "当前路由只承载 new_pages，旧 pages 保留参考但不参与运行。",
 ];
@@ -81,8 +87,8 @@ const sessionText = computed(() =>
         </ElCard>
         <ElCard shadow="never" class="stat-card">
           <span class="stat-card__label">页面数量</span>
-          <p class="stat-card__value">9</p>
-          <p class="stat-card__desc">Home、Login、Me、Shop、Blog、Follow、Voucher、Upload、BlogEditor。</p>
+          <p class="stat-card__value">10</p>
+          <p class="stat-card__desc">Home、Login、Me、Shop、Blog、Follow、Voucher、Upload、BlogEditor、Rag。</p>
         </ElCard>
         <ElCard shadow="never" class="stat-card">
           <span class="stat-card__label">统一壳子</span>

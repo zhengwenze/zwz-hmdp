@@ -10,6 +10,7 @@ import FollowPage from "../new_pages/FollowPage.vue";
 import VoucherPage from "../new_pages/VoucherPage.vue";
 import UploadPage from "../new_pages/UploadPage.vue";
 import BlogEditorPage from "../new_pages/BlogEditorPage.vue";
+import RagPage from "../new_pages/RagPage.vue";
 
 const routes = [
   {
@@ -111,6 +112,16 @@ const routes = [
         meta: {
           title: "图片上传",
           description: "统一管理博客图片上传、预览和删除。",
+          menu: true,
+        },
+      },
+      {
+        path: "rag",
+        name: "rag",
+        component: RagPage,
+        meta: {
+          title: "智能客服",
+          description: "基于本地文档知识库的最小可用 RAG 客服与索引状态页。",
           menu: true,
         },
       },

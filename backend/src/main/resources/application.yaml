@@ -20,6 +20,22 @@ spring:
         time-between-eviction-runs: 10s
   jackson:
     default-property-inclusion: non_null # JSON处理时忽略非空字段
+rag:
+  enabled: ${RAG_ENABLED:true}
+  docs-dir: ${RAG_DOCS_DIR:docs/rag}
+  ollama-base-url: ${RAG_OLLAMA_BASE_URL:http://localhost:11434}
+  chat-model: ${RAG_CHAT_MODEL:qwen2.5:7b}
+  embedding-model: ${RAG_EMBEDDING_MODEL:qwen3-embedding:0.6b}
+  milvus:
+    host: ${RAG_MILVUS_HOST:127.0.0.1}
+    port: ${RAG_MILVUS_PORT:19530}
+    collection-name: ${RAG_MILVUS_COLLECTION:kb_chunk}
+  max-segment-size: ${RAG_MAX_SEGMENT_SIZE:500}
+  max-segment-overlap: ${RAG_MAX_SEGMENT_OVERLAP:100}
+  max-dense-results: ${RAG_MAX_DENSE_RESULTS:8}
+  max-keyword-results: ${RAG_MAX_KEYWORD_RESULTS:8}
+  max-context-segments: ${RAG_MAX_CONTEXT_SEGMENTS:6}
+  max-memory-turns: ${RAG_MAX_MEMORY_TURNS:6}
 mybatis-plus:
   type-aliases-package: com.hmdp.entity # 别名扫描包
 logging:

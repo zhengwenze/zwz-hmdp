@@ -21,4 +21,8 @@ public class RedisConstants {
     public static final String FEED_KEY = "feed:";
     public static final String SHOP_GEO_KEY = "shop:geo:";
     public static final String USER_SIGN_KEY = "sign:";
+    public static final String RAG_SESSION_KEY = "rag:session:";
+    public static final Long RAG_SESSION_TTL = 30L;
+    public static final String RAG_ANSWER_CACHE_KEY = "rag:answer:";
+    public static final Long RAG_ANSWER_CACHE_TTL = 10L;
 }
