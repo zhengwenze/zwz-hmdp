@@ -66,9 +66,9 @@ onMounted(syncCurrentUser);
   <ElContainer class="app-layout">
     <ElAside width="220px" class="app-sidebar">
       <div class="app-sidebar__brand">
-        <span class="app-sidebar__eyebrow">HMDP Console</span>
-        <strong>new_pages 工作台</strong>
-        <span class="app-sidebar__hint">统一布局、统一结构、统一视觉</span>
+        <span class="app-sidebar__eyebrow">ZWZ-HMDP</span>
+        <strong>ZWZ-HMDP</strong>
+        <span class="app-sidebar__hint">zwz-hmdp</span>
       </div>
       <ElScrollbar class="app-sidebar__scroll">
         <ElMenu :default-active="route.path" router class="app-menu">
