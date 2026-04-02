@@ -1,348 +1,202 @@
-# Repository Guidelines
+# AGENTS.md
 
-This file provides durable instructions for coding agents working in this repository.
-It is intended for tools such as Codex, Claude Code, and similar agentic programming systems.
+## Purpose
 
-If a more specific `AGENTS.md` exists in a subdirectory, follow the closer file for work in that scope.
-If explicit user instructions conflict with this file, explicit user instructions win.
+这份文档定义 AI coding agent 在本仓库中的工作方式。
 
----
+目标是让 agent 做出安全、最小、可验证、便于评审的改动，并且不破坏项目已有的高并发设计。
 
-## 1. Project structure
+### Instruction Priority
 
-This is a full-stack application with:
+发生冲突时，按以下优先级执行：
 
-- `backend/` → Java Spring Boot service
-- `frontend/` → Vue + Vite application
-
-General expectations:
-
-- Backend owns domain logic, persistence, authentication, validation, cache coordination, and APIs.
-- Frontend owns UI, routing, state management, and API integration.
-- Avoid leaking frontend concerns into backend code.
-- Avoid putting persistence or infrastructure logic into frontend code.
-- Keep responsibilities separated by layer.
+1. 用户当前任务与明确要求
+2. 本文件中的安全约束和架构约束
+3. 仓库事实源：`README.md`、`backend/pom.xml`、`frontend/package.json`、`docker-compose.yml`
+4. 外部资料、示例实现、第三方文档
 
 ---
 
-## 2. What to optimize for
+## How To Work
 
-- Make the smallest correct change that fully solves the task.
-- Prefer consistency with existing code over introducing new patterns.
-- Keep changes easy to review.
-- Do not fix unrelated issues unless they block the requested task.
-- Prefer explicit, testable behavior over implicit magic.
-- Before finishing, verify the result with the most relevant checks.
+### Default workflow
 
----
+1. 先理解任务，再查看相关代码和配置
+2. 优先复用仓库内已有模式、工具类、命名和分层
+3. 仅在本仓库无法回答问题时，补充查官方文档或成熟Github开源实现
+4. 做最小且完整的改动，不做顺手重构
+5. 改完后做与风险匹配的验证
+6. 向用户说明改了什么、为什么这么改、如何验证
 
-## 3. Source of truth
+### Reuse and research
 
-When implementing or modifying behavior, follow this priority:
+- 先看仓库现有实现，再看外部资料
+- 优先复用已有 service、DTO、Redis key 约定、前端 services 和 stores
+- 引入新依赖前，先确认现有框架或当前代码库无法解决问题
+- 借鉴外部模式时要适配本仓库，不要直接照搬
 
-1. Explicit user request
-2. Closer directory-level `AGENTS.md`
-3. Existing code, tests, and configuration
-4. `README.md`, `docs/`, API contracts, and generated types
-5. General framework conventions
+### When planning is required
 
-Do not invent architecture or conventions that are not already present in the repository.
+以下情况先出计划，再实施：
 
----
+- 任务跨多个模块或多个文件，且行为耦合明显
+- 同时改后端和前端
+- 修改 API 行为、持久化逻辑、缓存策略、Redis 结构、消息流或部署配置
+- 任务本身含糊、风险高，或性能敏感
 
-## 4. Working style
+简单的单点修复、小范围文案或样式调整，可以直接实现。
 
-- Inspect relevant files before editing.
-- Reuse existing service, controller, mapper, DTO, entity, composable, store, and component patterns.
-- Avoid introducing new dependencies unless clearly necessary.
-- Avoid broad refactors unless the task explicitly requires them.
-- Avoid formatting-only diffs mixed with behavior changes.
-- Keep naming aligned with surrounding code.
+### When to stop and ask the user
 
-For multi-file changes:
+遇到以下情况，不要自行拍板，先和用户确认：
 
-- update all directly affected interfaces;
-- update related tests when present;
-- update docs if user-facing or integration-facing behavior changes.
-
----
-
-## 5. Search and file inspection
-
-Preferred tools for repository work:
-
-- Search text: `rg`
-- Find files: `fd` or `rg --files`
-- Inspect JSON: `jq`
-- Read files in focused chunks, not giant dumps
-
-Before editing a file, also inspect nearby:
-
-- tests
-- DTOs / request / response models
-- controllers / services / mappers / repositories
-- interceptor / config / utils
-- Vue components / stores / route definitions / API wrappers
-- docs or API contract files
+- 改秒杀语义、一人一单语义、库存扣减语义
+- 改缓存 key、TTL、失效策略或重建策略
+- 改 Redis Stream 的 ACK、重试、Pending List 或消费者行为
+- 改前后端接口字段、字段类型或响应语义
+- 引入新依赖、替换已有依赖，或切换包管理器
+- 需要做明显超出当前任务范围的重构
 
 ---
 
-## 6. Backend rules (Spring Boot)
+## Repo Facts
 
-Scope: anything under `backend/`
+### Tech stack
 
-### 6.1 Architecture
+- Backend: Java 8, Spring Boot 2.7.4, Spring MVC, MyBatis Plus 3.5.2, Redis, Redisson, Maven
+- Frontend: Vue 3, Vite, Vue Router, Pinia, Element Plus, Axios
+- Runtime: Docker Compose, MySQL 8, Redis 7.4, Nginx
 
-Prefer the repository’s existing Spring Boot layering:
+### Effective structure
 
-- controller → service → mapper / persistence
-- DTO / request / response objects separated from persistence entities where appropriate
-- validation at request boundaries
-- business logic in services, not controllers
-- SQL / query concerns in mapper layer
-- shared infrastructure in `config/`, `interceptor/`, or `utils/`
+- `backend/src/main/java/com/hmdp/config/`：Redis、Redisson、MVC 等配置
+- `backend/src/main/java/com/hmdp/controller/`：REST controllers
+- `backend/src/main/java/com/hmdp/service/`：service 接口与实现
+- `backend/src/main/java/com/hmdp/mapper/`：MyBatis Plus mappers
+- `backend/src/main/java/com/hmdp/dto/`：DTOs
+- `backend/src/main/java/com/hmdp/entity/`：entities
+- `backend/src/main/java/com/hmdp/interceptor/`：登录和 token 相关拦截器
+- `backend/src/main/java/com/hmdp/utils/`：`CacheClient`、`RedisIdWorker` 等工具
+- `backend/src/main/resources/seckill.lua`：秒杀原子脚本
+- `backend/src/main/resources/unlock.lua`：解锁脚本
+- `backend/db/`：初始化 SQL
+- `frontend/src/new_pages/`：新版 Element Plus 页面
+- `frontend/src/pages/`：现有页面入口与旧页面
+- `frontend/src/components/`：复用组件
+- `frontend/src/layout/`：布局组件
+- `frontend/src/router/`：路由定义
+- `frontend/src/services/`：API wrappers
+- `frontend/src/stores/`：Pinia stores
+- `frontend/src/config/`：前端配置常量
+- `frontend/src/utils/`：前端工具函数
+- `frontend/src/styles/`：主题与布局样式
+- `docker-compose.yml`：本地编排
+- `frontend/nginx.conf`：前端路由回退与反向代理
 
-Do not introduce new architectural styles unless the repository already uses them.
+### Behavior-critical facts
 
-### 6.2 Controllers
+- 秒杀入口依赖 `seckill.lua` 做库存校验、一人一单校验和消息投递
+- 订单异步链路依赖 Redis Stream `stream.orders`
+- 秒杀下单在数据库落库前还有 Redisson 锁兜底
+- 热点店铺缓存依赖 `CacheClient.queryWithLogicalExpire()`
+- 附近商铺查询依赖 Redis GEO 和 `order by field(id, ...)` 保序回表
+- 登录 token 通过请求头 `authorization` 传递，不使用 Cookie Session
+- 前端路由当前使用 Hash 模式
 
-- Keep controllers thin.
-- Controllers should handle routing, request parsing, auth boundary entry, validation entry, and response shaping.
-- Do not place complex business logic in controllers.
-- Use existing response conventions consistently.
-- Preserve backward compatibility for public APIs unless the task requires a contract change.
+### Package manager note
 
-### 6.3 Services
-
-- Put business rules in services.
-- Prefer extending existing services over duplicating logic.
-- Keep transaction boundaries explicit and narrow.
-- If a method changes business behavior, update or add service-level tests when present.
-- For high-concurrency logic, preserve current locking, idempotency, and cache consistency behavior unless explicitly changing it.
-
-### 6.4 Persistence and MyBatis Plus
-
-- Reuse existing MyBatis Plus patterns, mapper style, and query style.
-- Do not introduce inefficient query behavior without reason.
-- Be careful with pagination semantics, batch updates, and conditional queries.
-- If SQL is defined in XML, keep mapper interface and XML aligned.
-- Do not move simple query logic into handwritten SQL unless necessary.
-- If schema or entity changes are required, update the repository’s existing migration or SQL script strategy consistently.
-
-### 6.5 Redis, cache, and concurrency
-
-- Preserve existing Redis key patterns and expiration strategy unless the task requires change.
-- Be careful with cache penetration, cache breakdown, and cache consistency logic.
-- For distributed lock or Redisson logic, do not weaken safety guarantees.
-- For seckill / voucher / stock logic, preserve atomicity and duplicate-order protection.
-- If changing Lua script behavior, also inspect all Java call sites and related order / stock code.
-
-### 6.6 Validation and error handling
-
-- Validate external inputs at the boundary.
-- Reuse existing exception and error response patterns.
-- Do not expose internal stack traces, SQL details, or infrastructure details in API responses.
-- Keep error messages and response shape consistent with existing endpoints.
-
-### 6.7 Security and authentication
-
-- Do not weaken authentication, authorization, token parsing, or input validation.
-- Preserve existing interceptor behavior and request header conventions.
-- Do not hardcode credentials, tokens, or secrets.
-- Do not modify security-sensitive configuration unless the task clearly requires it.
-
-### 6.8 API changes
-
-If changing an API:
-
-- update controller, DTOs, service logic, and persistence code together when needed;
-- update tests when present;
-- update API docs or contract files if present;
-- update frontend integration code in the same task when required.
+前端目录中同时存在 `yarn.lock` 和 `package-lock.json`。默认不要擅自切换包管理器；如果任务涉及依赖安装、锁文件更新或脚本调整，先确认当前任务应遵循的标准。
 
 ---
 
-## 7. Frontend rules (Vue + Vite)
+## Critical Path Guardrails
 
-Scope: anything under `frontend/`
+以下路径是高风险区域，处理时优先保守：
 
-### 7.1 General
+- 不要把秒杀资格判断退回数据库热路径
+- 不要绕过 `seckill.lua`、Redis Stream 或 Redisson 兜底锁
+- 不要随意改变消息确认、重试和 Pending List 恢复逻辑
+- 不要把 Redis 热路径改成高频数据库循环查询
+- 不要混用缓存穿透防护、逻辑过期和缓存失效策略
+- 不要改动 GEO 查询分页和顺序保持逻辑，除非任务明确要求
+- 不要静默改变 token 刷新行为或 `authorization` 头约定
+- 不要破坏 Hash 路由和 Nginx 回退假设
 
-- Follow the existing component style and project conventions already used nearby.
-- Do not introduce a new state management or request pattern if one already exists.
-- Reuse existing UI components, utilities, and request wrappers before creating new ones.
-- Keep business rules out of presentation-only components when possible.
+如果必须改这些区域，要在结果里明确说明：
 
-### 7.2 Components
-
-- Keep components focused and reasonably small.
-- Avoid deeply nested inline logic in templates.
-- Prefer computed state over duplicating derived values.
-- Keep props, emits, and local state explicit.
-- Reuse existing page and component structure where possible.
-
-### 7.3 Routing and pages
-
-- Follow existing route conventions and navigation behavior.
-- If adding a page, update routes and entry points consistently.
-- Do not break deep links or existing route names unless the task requires it.
-
-### 7.4 API integration
-
-- Keep API calling code centralized according to repo conventions.
-- Reuse existing auth header handling, token usage, interceptors, and error handling.
-- If backend response contracts change, update frontend consumers in the same task.
-- Do not silently swallow request failures.
-
-### 7.5 UX consistency
-
-- Reuse existing loading, empty, error, and success states.
-- Keep form validation and feedback consistent with nearby pages.
-- If changing user-visible behavior, update related text, docs, or examples where appropriate.
+- 改了什么行为
+- 为什么必须这样改
+- 如何验证没有破坏关键链路
 
 ---
 
-## 8. Full-stack coordination rules
+## Change Rules
 
-For changes that touch both `backend/` and `frontend/`:
+### Backend
 
-- keep API contract changes synchronized;
-- update DTOs / response models and frontend consumers together;
-- verify auth, validation, and error handling across both sides;
-- avoid shipping backend contract changes without updating the frontend usage.
+- 保持 `controller -> service -> mapper/persistence` 分层
+- 业务逻辑放在 service，不要堆到 controller
+- 修改事务、异步线程或代理调用前，先确认 Spring 事务边界
+- 改 Redis key、Lua、Stream、锁逻辑时，补充关键影响说明
+- 不要吞异常；要保留足够的日志和可观测性
 
-When adding new functionality end-to-end, typical order is:
+### Frontend
 
-1. backend model / DTO / API
-2. backend tests if present
-3. frontend API integration
-4. frontend UI wiring
-5. end-to-end verification
+- 页面逻辑留在 pages，复用逻辑抽到 components、services、stores
+- 统一通过现有 API wrapper 调后端，避免重复请求封装
+- UI 保持当前 Vue 3 + Element Plus 风格，不引入新的 UI 框架
+- 变更路由、代理或部署方式时，同时检查开发和容器场景
 
----
+### API and dependency changes
 
-## 9. Project-specific conventions
+- 改接口时，同时更新后端 controller/service/DTO 和前端 services/调用方
+- 不要静默改字段名、字段类型、状态码语义或返回结构
+- 新增依赖必须说明必要性和替代方案为何不合适
 
-These rules reflect current repository behavior and should be preserved unless the task explicitly changes them:
+### Documentation and completion
 
-- Backend is a Spring Boot application under `backend/`.
-- Persistence uses MyBatis Plus and mapper-based access patterns.
-- Redis is used for caching and concurrency-sensitive flows.
-- Common API response structure follows:
-  - `success`
-  - `errorMsg`
-  - `data`
-  - `total`
-- Login token is passed by request header:
-  - `authorization: <token>`
-- There is no unified `/api` prefix by default unless existing code in a specific area defines one.
-- Time fields commonly use `LocalDateTime`.
-- Some endpoints may return `null` for empty results instead of empty arrays; preserve existing behavior unless explicitly changing the API contract.
-- Image fields such as shop or blog images may use comma-separated strings instead of arrays; preserve existing contract unless explicitly changing it.
-- Do not silently convert existing response contracts without updating both backend and frontend.
+行为、结构、启动方式或关键路径有变化时，更新相关文档，通常至少检查 `README.md` 是否需要同步。
+
+任务可以视为完成，至少要满足：
+
+- 改动范围与任务一致
+- 复用了现有模式，没有引入无关重构
+- 前后端契约保持一致
+- 关键路径没有被绕过
+- 已做与风险相称的验证
+- 已说明未验证项、风险或假设
 
 ---
 
-## 10. Testing and validation
+## Validation Matrix
 
-Run the smallest useful validation first, then widen only if needed.
+按改动类型选择最低验证，不要机械地全跑一遍。
 
-### 10.1 Backend minimum validation
+| 改动类型                                      | 最低验证                                                                                           |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| 仅后端普通逻辑                                | `cd backend && mvn test`；若仓库暂无可用测试，则至少做 `mvn -q -DskipTests package` 或等价编译验证 |
+| 后端关键路径：秒杀、缓存、Redis、Stream、事务 | 相关命令验证 + 明确写出手工验证思路                                                                |
+| 仅前端页面或交互                              | `cd frontend && yarn dev`                                                                          |
+| 前端构建、路由、资源或部署相关                | `cd frontend && yarn build`，必要时补 `yarn dev`                                                   |
+| 同时改前后端接口                              | 至少分别验证后端和前端，并确认联调路径                                                             |
+| Docker、环境、代理、容器编排                  | `docker compose up -d --build`                                                                     |
 
-For backend changes, prefer this order:
+### Validation notes
 
-1. targeted unit or integration test for changed service/controller if present
-2. related module tests if shared code changed
-3. broader backend test suite only when needed
-
-Typical backend commands, depending on repo setup:
-
-- `cd backend && mvn test`
-- `cd backend && mvn -Dtest=ClassName test`
-- `cd backend && ./mvnw test`
-
-### 10.2 Frontend minimum validation
-
-For frontend changes, prefer this order:
-
-1. targeted test if the repo has frontend tests
-2. build or type-related validation
-3. broader frontend checks only when needed
-
-Typical frontend commands, depending on repo setup:
-
-- `cd frontend && npm run build`
-- `cd frontend && npm run test`
-- `cd frontend && pnpm build`
-
-### 10.3 Full-stack checks
-
-For API contract or cross-stack behavior changes, verify as many as are available:
-
-- backend tests pass;
-- frontend build / lint / tests pass if configured;
-- contract usage is aligned on both sides.
-
-Do not claim success without running relevant checks when tooling is available.
+- 当前仓库下未发现 `backend/src/test`，因此后端变更不要只写“已跑测试”，要说明实际跑的是测试、编译、启动烟测还是手工验证
+- 前端验证优先沿用 README 中现有命令：`yarn install`、`yarn dev`
+- 若任务涉及依赖或锁文件，先确认包管理器后再执行安装命令
+- Bug 修复优先复现问题，再验证修复
 
 ---
 
-## 11. Editing rules
+## Handoff Template
 
-- Preserve public APIs unless changing them is required.
-- Do not edit generated files by hand if the repo marks them as generated.
-- If generated artifacts must change, regenerate them using the repo’s standard process.
-- Do not add TODOs, placeholder implementations, or dead code unless explicitly requested.
-- Do not add comments that merely restate the code.
-- Add comments only for non-obvious intent, constraints, or edge-case reasoning.
+结束任务时，给出简洁交接，至少包含：
 
----
-
-## 12. Database and scripts
-
-If the task involves schema or SQL changes:
-
-- follow the repository’s existing SQL and script conventions;
-- update affected entity, DTO, mapper, service, and tests together when needed;
-- be careful with destructive or data-loss-prone changes.
-
-Do not perform destructive data operations unless explicitly required.
-
----
-
-## 13. Config and environments
-
-- Do not commit secrets, private keys, tokens, or credentials.
-- Do not modify deployment, Docker, CI, or production configuration unless the task explicitly requires it.
-- Keep local development config patterns consistent with the existing repository.
-- Prefer environment variables and existing config abstractions over hardcoded values.
-
----
-
-## 14. Performance and reliability
-
-- Avoid unnecessary allocations, duplicate requests, and repeated database queries.
-- Be careful with pagination, sorting, filtering, and lazy-loading behavior.
-- Preserve existing performance patterns for hot paths such as cache lookup, voucher ordering, and shop query flows.
-- Do not introduce speculative optimization unless a real bottleneck is involved.
-
----
-
-## 15. Security and safety boundaries
-
-- Do not remove or weaken auth, permission checks, interceptors, validation, or sanitization without explicit instruction.
-- Do not expose internal error details.
-- Do not change secrets, credentials, production URLs, certificates, or infrastructure settings unless clearly required.
-- Ask before making irreversible or high-risk changes outside normal code edits.
-
----
-
-## 16. Git and commit message rules
-
-Use Conventional Commits for all commit messages.
-
-Format:
-
-```text
-<type>(<scope>): <subject>
-```
+- Summary of changes
+- Files changed
+- Key design decisions
+- Verification performed
+- Risks / follow-ups
+- Assumptions or limitations
