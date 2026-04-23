@@ -1,6 +1,6 @@
 package com.hmdp.config;
 
-import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.ollama.OllamaChatModel;
 import dev.langchain4j.model.ollama.OllamaEmbeddingModel;
@@ -16,7 +16,7 @@ import java.time.Duration;
 public class RagConfig {
 
     @Bean
-    public ChatModel ragChatModel(RagProperties properties) {
+    public ChatLanguageModel ragChatModel(RagProperties properties) {
         return OllamaChatModel.builder()
                 .baseUrl(properties.getOllamaBaseUrl())
                 .modelName(properties.getChatModel())

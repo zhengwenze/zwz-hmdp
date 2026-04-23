@@ -28,7 +28,7 @@ import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.data.segment.TextSegment;
-import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
@@ -84,7 +84,7 @@ public class RagServiceImpl implements IRagService {
     @Resource
     private EmbeddingModel ragEmbeddingModel;
     @Resource
-    private ChatModel ragChatModel;
+    private ChatLanguageModel ragChatModel;
     @Resource
     private MilvusEmbeddingStore ragEmbeddingStore;
     @Resource
@@ -169,7 +169,7 @@ public class RagServiceImpl implements IRagService {
     @Override
     public List<RagDocumentDTO> listDocuments() {
         return knowledgeDocumentMapper.selectList(new LambdaQueryWrapper<KnowledgeDocument>()
-                        .orderByDesc(KnowledgeDocument::getUpdateTime))
+                .orderByDesc(KnowledgeDocument::getUpdateTime))
                 .stream()
                 .map(this::toDocumentDTO)
                 .toList();
@@ -193,7 +193,8 @@ public class RagServiceImpl implements IRagService {
 
         List<Path> files = listKnowledgeFiles(docsDir);
         Map<String, KnowledgeDocument> existingDocuments = knowledgeDocumentMapper.selectList(null).stream()
-                .collect(Collectors.toMap(KnowledgeDocument::getFilePath, document -> document, (left, right) -> left, LinkedHashMap::new));
+                .collect(Collectors.toMap(KnowledgeDocument::getFilePath, document -> document, (left, right) -> left,
+                        LinkedHashMap::new));
 
         removeDeletedDocuments(files, existingDocuments);
 
@@ -249,7 +250,8 @@ public class RagServiceImpl implements IRagService {
 
     private void upsertDocument(Path file, KnowledgeDocument existing) throws Exception {
         String fileHash = sha256(Files.readAllBytes(file));
-        if (existing != null && Objects.equals(existing.getFileHash(), fileHash) && "READY".equals(existing.getStatus())) {
+        if (existing != null && Objects.equals(existing.getFileHash(), fileHash)
+                && "READY".equals(existing.getStatus())) {
             return;
         }
 
@@ -286,7 +288,7 @@ public class RagServiceImpl implements IRagService {
                 .map(segment -> segment.metadata().getString("chunkId"))
                 .toList();
         List<Embedding> embeddings = ragEmbeddingModel.embedAll(segments).content();
-        ragEmbeddingStore.addAll(embeddingIds, embeddings, segments);
+        ragEmbeddingStore.addAll(embeddings, segments);
 
         persistChunks(document.getId(), file.getFileName().toString(), segments);
         document.setStatus("READY")
@@ -417,8 +419,7 @@ public class RagServiceImpl implements IRagService {
                     segment.metadata().getInteger("pageNo"),
                     segment.text(),
                     match.score(),
-                    "dense"
-            ));
+                    "dense"));
         }
         return matches;
     }
@@ -462,13 +463,13 @@ public class RagServiceImpl implements IRagService {
                     chunk.getPageNo(),
                     chunk.getContent(),
                     1.0D / (i + 1),
-                    "keyword"
-            ));
+                    "keyword"));
         }
         return matches;
     }
 
-    private List<RetrievedChunk> reciprocalRankFuse(List<RetrievedChunk> denseMatches, List<RetrievedChunk> keywordMatches) {
+    private List<RetrievedChunk> reciprocalRankFuse(List<RetrievedChunk> denseMatches,
+            List<RetrievedChunk> keywordMatches) {
         Map<String, RankedChunk> ranked = new LinkedHashMap<>();
         mergeByRrf(ranked, denseMatches);
         mergeByRrf(ranked, keywordMatches);
@@ -500,7 +501,7 @@ public class RagServiceImpl implements IRagService {
             messages.add(AiMessage.from(turn.getAnswer()));
         });
         messages.add(UserMessage.from(buildPrompt(question, chunks, traceId)));
-        return ragChatModel.chat(messages).aiMessage().text().trim();
+        return ragChatModel.generate(messages).content().text().trim();
     }
 
     private String buildPrompt(String question, List<RetrievedChunk> chunks, String traceId) {
@@ -590,8 +591,7 @@ public class RagServiceImpl implements IRagService {
                     cacheKey,
                     objectMapper.writeValueAsString(response),
                     RedisConstants.RAG_ANSWER_CACHE_TTL,
-                    TimeUnit.MINUTES
-            );
+                    TimeUnit.MINUTES);
         } catch (Exception e) {
             log.warn("Failed to cache RAG answer", e);
         }
@@ -608,8 +608,7 @@ public class RagServiceImpl implements IRagService {
                     RedisConstants.RAG_SESSION_KEY + sessionId,
                     objectMapper.writeValueAsString(turns),
                     RedisConstants.RAG_SESSION_TTL,
-                    TimeUnit.MINUTES
-            );
+                    TimeUnit.MINUTES);
         } catch (Exception e) {
             log.warn("Failed to save RAG turn", e);
         }
@@ -642,8 +641,7 @@ public class RagServiceImpl implements IRagService {
                 document.getStatus(),
                 document.getChunkCount(),
                 document.getErrorMsg(),
-                document.getUpdateTime()
-        );
+                document.getUpdateTime());
     }
 
     private RagIngestJobDTO toJobDTO(KnowledgeIngestJob job) {
@@ -655,8 +653,7 @@ public class RagServiceImpl implements IRagService {
                 job.getFailedFiles(),
                 job.getStartedTime(),
                 job.getFinishedTime(),
-                job.getErrorMsg()
-        );
+                job.getErrorMsg());
     }
 
     private static RagCitationDTO toCitation(RetrievedChunk chunk) {
@@ -665,8 +662,7 @@ public class RagServiceImpl implements IRagService {
                 chunk.getFileName(),
                 chunk.getSection(),
                 chunk.getPageNo(),
-                truncate(chunk.getContent(), 180)
-        );
+                truncate(chunk.getContent(), 180));
     }
 
     private static String truncate(String value, int maxLength) {
