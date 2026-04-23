@@ -63,7 +63,7 @@
 
 ### Tech stack
 
-- Backend: Java 8, Spring Boot 2.7.4, Spring MVC, MyBatis Plus 3.5.2, Redis, Redisson, Maven
+- Backend: Java 21, Spring Boot 3.5.0, Spring MVC, MyBatis Plus 3.5.7, Redis, Redisson, Maven
 - Frontend: Vue 3, Vite, Vue Router, Pinia, Element Plus, Axios
 - Runtime: Docker Compose, MySQL 8, Redis 7.4, Nginx
 

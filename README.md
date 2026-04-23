@@ -1,10 +1,10 @@
 # HMDP 高并发秒杀与探店平台
 
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-2.7.4-green?style=flat-square&logo=springboot)](https://spring.io/projects/spring-boot)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.0-green?style=flat-square&logo=springboot)](https://spring.io/projects/spring-boot)
 [![Vue](https://img.shields.io/badge/Vue-3.5.30-42b883?style=flat-square&logo=vuedotjs)](https://vuejs.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=flat-square&logo=mysql)](https://www.mysql.com/)
 [![Redis](https://img.shields.io/badge/Redis-7.4-CB2027?style=flat-square&logo=redis)](https://redis.io/)
-[![Java](https://img.shields.io/badge/Java-8-orange?style=flat-square&logo=openjdk)](https://www.java.com/)
+[![Java](https://img.shields.io/badge/Java-21-orange?style=flat-square&logo=openjdk)](https://www.java.com/)
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square)](LICENSE)
 
 一个围绕电商秒杀链路、探店内容分发和高频商铺查询构建的全栈项目。后端使用 Spring Boot + MyBatis Plus，前端使用 Vue 3 + Vite，重点解决高并发秒杀中的超卖、一人一单、异步下单可靠性、热点缓存击穿，以及基于地理位置的商铺查询性能问题。
@@ -21,9 +21,9 @@
 
 | 分类 | 技术 | 实际用途 |
 | --- | --- | --- |
-| 核心框架 | Spring Boot 2.7.4 | Web 服务、IOC、事务管理 |
+| 核心框架 | Spring Boot 3.5.0 | Web 服务、IOC、事务管理 |
 | Web | Spring MVC | REST API、拦截器、参数绑定 |
-| 持久层 | MyBatis Plus 3.5.2 | CRUD、条件查询、分页 |
+| 持久层 | MyBatis Plus 3.5.7 | CRUD、条件查询、分页 |
 | 数据库 | MySQL 8.0 | 用户、商铺、博客、优惠券、订单等持久化 |
 | 缓存 / 中间件 | Spring Data Redis | 登录态、缓存、签到 Bitmap、点赞 ZSet、关注 Set、Feed、GEO、Stream |
 | 分布式锁 | Redisson 3.17.7 | 秒杀订单创建兜底锁 |
@@ -47,7 +47,7 @@
 | 分类 | 技术 | 实际用途 |
 | --- | --- | --- |
 | 容器编排 | Docker Compose | 一键拉起 MySQL、Redis、后端、前端 |
-| 后端镜像 | Maven 多阶段构建 + Eclipse Temurin 8 JRE | 构建并运行 Spring Boot Jar |
+| 后端镜像 | Maven 多阶段构建 + Eclipse Temurin 21 JRE | 构建并运行 Spring Boot Jar |
 | 前端镜像 | Node 20 Alpine + Nginx Alpine | 构建静态资源并通过 Nginx 提供服务 |
 | 反向代理 | Nginx | 静态资源托管、前端路由回退、接口转发到后端 |
 
@@ -254,7 +254,7 @@ docker compose up -d --build
 
 环境要求：
 
-- JDK 8
+- JDK 21
 - Maven
 - Node.js 20
 - Yarn
