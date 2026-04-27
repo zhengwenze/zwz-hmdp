@@ -20,34 +20,28 @@ import java.nio.file.Paths;
  */
 @Configuration
 public class MvcConfig implements WebMvcConfigurer {
-    @Resource
-    private StringRedisTemplate stringRedisTemplate;
+        @Resource
+        private StringRedisTemplate stringRedisTemplate;
 
-    @Override
-    public void addInterceptors(InterceptorRegistry registry) {
-        //登陆拦截器
-        registry
-                .addInterceptor(new LoginInterceptor())
-                .excludePathPatterns("/user/code"
-                        , "/user/login"
-                        , "/blog/hot"
-                        , "/shop/**"
-                        , "/shop-type/**"
-                        , "/upload/**"
-                        , "/voucher/**"
-                        , "/blogs/**"
-                )
-                .order(1);
-        //Token续命拦截器
-        registry
-                .addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate))
-                .addPathPatterns("/**")
-                .order(0);
-    }
+        @Override
+        public void addInterceptors(InterceptorRegistry registry) {
+                // 登陆拦截器
+                registry
+                                .addInterceptor(new LoginInterceptor())
+                                .excludePathPatterns("/user/code", "/user/login", "/blog/hot", "/shop/**",
+                                                "/shop-type/**", "/upload/**", "/voucher/**", "/blogs/**")
+                                .order(1);
+                // Token续命拦截器
+                registry
+                                .addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate))
+                                .addPathPatterns("/**")
+                                .order(0);
+        }
 
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        registry.addResourceHandler("/blogs/**")
-                .addResourceLocations(Paths.get(SystemConstants.IMAGE_UPLOAD_DIR, "blogs").toUri().toString());
-    }
+        @Override
+        public void addResourceHandlers(ResourceHandlerRegistry registry) {
+                registry.addResourceHandler("/blogs/**")
+                                .addResourceLocations(Paths.get(SystemConstants.IMAGE_UPLOAD_DIR, "blogs").toUri()
+                                                .toString());
+        }
 }

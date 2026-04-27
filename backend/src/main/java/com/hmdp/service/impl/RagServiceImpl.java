@@ -50,7 +50,6 @@ import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -284,9 +283,6 @@ public class RagServiceImpl implements IRagService {
             throw new IllegalStateException("文档切片为空");
         }
 
-        List<String> embeddingIds = segments.stream()
-                .map(segment -> segment.metadata().getString("chunkId"))
-                .toList();
         List<Embedding> embeddings = ragEmbeddingModel.embedAll(segments).content();
         ragEmbeddingStore.addAll(embeddings, segments);
 
