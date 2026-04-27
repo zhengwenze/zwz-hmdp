@@ -34,25 +34,25 @@
 
 ## 技术栈
 
-| 层次 | 技术 | 作用 |
-| --- | --- | --- |
-| 后端 | Java 21, Spring Boot 3.5, Spring MVC | REST API、事务、配置管理 |
-| 持久层 | MyBatis Plus 3.5.7, MySQL 8 | 业务数据落库与查询 |
-| 缓存与中间件 | Redis 7.4, Redisson | 秒杀资格校验、缓存、签到、点赞榜、关注流、GEO、分布式锁 |
-| 前端 | Vue 3, Vite, Vue Router, Pinia, Element Plus | 管理台页面、状态管理、接口联调 |
-| AI / 检索 | LangChain4j, Ollama, Milvus, MinIO, etcd | 本地知识库索引与 RAG 对话 |
-| 运行环境 | Docker Compose, Nginx | 本地一键启动、前端静态托管、反向代理 |
+| 层次         | 技术                                         | 作用                                                    |
+| ------------ | -------------------------------------------- | ------------------------------------------------------- |
+| 后端         | Java 21, Spring Boot 3.5, Spring MVC         | REST API、事务、配置管理                                |
+| 持久层       | MyBatis Plus 3.5.7, MySQL 8                  | 业务数据落库与查询                                      |
+| 缓存与中间件 | Redis 7.4, Redisson                          | 秒杀资格校验、缓存、签到、点赞榜、关注流、GEO、分布式锁 |
+| 前端         | Vue 3, Vite, Vue Router, Pinia, Element Plus | 管理台页面、状态管理、接口联调                          |
+| AI / 检索    | LangChain4j, Ollama, Milvus, MinIO, etcd     | 本地知识库索引与 RAG 对话                               |
+| 运行环境     | Docker Compose, Nginx                        | 本地一键启动、前端静态托管、反向代理                    |
 
 ## 核心能力
 
-| 能力 | 解决的问题 | 仓库中的关键实现 |
-| --- | --- | --- |
-| 秒杀下单 | 防超卖、防重复下单、削峰 | `backend/src/main/resources/seckill.lua`、`VoucherOrderServiceImpl`、`RedisIdWorker` |
-| 热点缓存 | 避免缓存击穿、穿透 | `CacheClient.queryWithLogicalExpire()`、`queryWithPassThrough()` |
-| 社交分发 | 点赞榜、关注关系、粉丝收件箱 | Redis `ZSet`、`Set`、`feed:{userId}` |
-| 附近商铺 | 按距离排序并分页 | Redis `GEO` + `order by field(id, ...)` |
-| 登录与签到 | 无 Session 登录态、低成本连续签到 | `authorization` token + Redis `Bitmap` |
-| 文档客服 | 本地知识库问答、重建索引、引用片段 | `RagServiceImpl`、`RagController`、`docs/rag/` |
+| 能力       | 解决的问题                         | 仓库中的关键实现                                                                     |
+| ---------- | ---------------------------------- | ------------------------------------------------------------------------------------ |
+| 秒杀下单   | 防超卖、防重复下单、削峰           | `backend/src/main/resources/seckill.lua`、`VoucherOrderServiceImpl`、`RedisIdWorker` |
+| 热点缓存   | 避免缓存击穿、穿透                 | `CacheClient.queryWithLogicalExpire()`、`queryWithPassThrough()`                     |
+| 社交分发   | 点赞榜、关注关系、粉丝收件箱       | Redis `ZSet`、`Set`、`feed:{userId}`                                                 |
+| 附近商铺   | 按距离排序并分页                   | Redis `GEO` + `order by field(id, ...)`                                              |
+| 登录与签到 | 无 Session 登录态、低成本连续签到  | `authorization` token + Redis `Bitmap`                                               |
+| 文档客服   | 本地知识库问答、重建索引、引用片段 | `RagServiceImpl`、`RagController`、`docs/rag/`                                       |
 
 ## 架构总览
 
@@ -182,21 +182,21 @@ ollama pull qwen3-embedding:0.6b
 
 常用环境变量如下：
 
-| 变量 | 默认值 | 说明 |
-| --- | --- | --- |
-| `SERVER_PORT` | `8081` | 后端端口 |
-| `MYSQL_HOST` | `127.0.0.1` | MySQL 主机 |
-| `MYSQL_PORT` | `3306` | MySQL 端口 |
-| `MYSQL_DATABASE` | `hmdp` | 数据库名 |
-| `MYSQL_USER` | `root` | 数据库用户 |
-| `MYSQL_PASSWORD` | `root` | 数据库密码 |
-| `REDIS_HOST` | `localhost` | Redis 主机 |
-| `REDIS_PORT` | `6379` | Redis 端口 |
-| `RAG_ENABLED` | `true` | 是否启用 RAG 相关 Bean |
-| `RAG_DOCS_DIR` | `docs/rag` | 知识库文档目录 |
-| `RAG_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama 地址 |
-| `RAG_MILVUS_HOST` | `127.0.0.1` | Milvus 地址 |
-| `RAG_MILVUS_PORT` | `19530` | Milvus 端口 |
+| 变量                  | 默认值                   | 说明                   |
+| --------------------- | ------------------------ | ---------------------- |
+| `SERVER_PORT`         | `8081`                   | 后端端口               |
+| `MYSQL_HOST`          | `127.0.0.1`              | MySQL 主机             |
+| `MYSQL_PORT`          | `3306`                   | MySQL 端口             |
+| `MYSQL_DATABASE`      | `hmdp`                   | 数据库名               |
+| `MYSQL_USER`          | `root`                   | 数据库用户             |
+| `MYSQL_PASSWORD`      | `root`                   | 数据库密码             |
+| `REDIS_HOST`          | `localhost`              | Redis 主机             |
+| `REDIS_PORT`          | `6379`                   | Redis 端口             |
+| `RAG_ENABLED`         | `true`                   | 是否启用 RAG 相关 Bean |
+| `RAG_DOCS_DIR`        | `docs/rag`               | 知识库文档目录         |
+| `RAG_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama 地址            |
+| `RAG_MILVUS_HOST`     | `127.0.0.1`              | Milvus 地址            |
+| `RAG_MILVUS_PORT`     | `19530`                  | Milvus 端口            |
 
 完整配置见 [backend/src/main/resources/application.yaml](./backend/src/main/resources/application.yaml)。
 
