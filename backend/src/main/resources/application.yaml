@@ -20,6 +20,29 @@ spring:
         time-between-eviction-runs: 10s
   jackson:
     default-property-inclusion: non_null # JSON处理时忽略非空字段
+hmdp:
+  async:
+    seckill-order:
+      core-size: 1
+      max-size: 1
+      queue-capacity: 1
+      keep-alive-seconds: 60
+      thread-name-prefix: hmdp-seckill-order-
+      await-termination-seconds: 30
+    cache-rebuild:
+      core-size: 2
+      max-size: 4
+      queue-capacity: 200
+      keep-alive-seconds: 60
+      thread-name-prefix: hmdp-cache-rebuild-
+      await-termination-seconds: 30
+    rag-rebuild:
+      core-size: 2
+      max-size: 2
+      queue-capacity: 20
+      keep-alive-seconds: 60
+      thread-name-prefix: hmdp-rag-rebuild-
+      await-termination-seconds: 60
 rag:
   enabled: ${RAG_ENABLED:true}
   docs-dir: ${RAG_DOCS_DIR:docs/rag}

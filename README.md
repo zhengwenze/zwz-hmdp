@@ -198,6 +198,12 @@ ollama pull qwen3-embedding:0.6b
 | `RAG_MILVUS_HOST`     | `127.0.0.1`              | Milvus 地址            |
 | `RAG_MILVUS_PORT`     | `19530`                  | Milvus 端口            |
 
+另外，后端业务异步线程池支持通过 `hmdp.async.*` 配置：
+
+- `hmdp.async.seckill-order.*`：秒杀订单 Redis Stream 消费线程
+- `hmdp.async.cache-rebuild.*`：热点缓存逻辑过期后的后台重建线程
+- `hmdp.async.rag-rebuild.*`：RAG 知识库重建后台线程
+
 完整配置见 [backend/src/main/resources/application.yaml](./backend/src/main/resources/application.yaml)。
 
 ## 项目结构

@@ -21,16 +21,17 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.connection.stream.*;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.*;
 
 /**
  * <p>
@@ -57,72 +58,109 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Resource
     @Lazy
     private IVoucherOrderService voucherOrderService;
+    @Resource(name = "seckillOrderExecutor")
+    private ThreadPoolTaskExecutor seckillOrderExecutor;
     private static final DefaultRedisScript<Long> SECKILL_SCRIPT;
-    //    private static final BlockingQueue<VoucherOrder> orderTasks=new ArrayBlockingQueue<>(1024*1024);
-    private static final ExecutorService SECKILL_ORDER_EXECUTOR = Executors.newSingleThreadExecutor();
+    private static final String QUEUE_NAME = "stream.orders";
+    private static final String GROUP_NAME = "g1";
+    private static final String CONSUMER_NAME = "c1";
+    private volatile boolean running = true;
 
     @PostConstruct
     private void init() {
-        SECKILL_ORDER_EXECUTOR.submit(() -> {
-            String queueName="stream.orders";
-            while (true) {
-                try {
-                    //从消息队列中获取订单信息
-                    List<MapRecord<String, Object, Object>> list = stringRedisTemplate.opsForStream().read(
-                            Consumer.from("g1", "c1")
-                            , StreamReadOptions.empty().count(1).block(Duration.ofSeconds(2))
-                            , StreamOffset.create(queueName, ReadOffset.lastConsumed())
-                    );
-                    //判断消息时候获取成功
-                    if (list==null||list.isEmpty()){
-                        //获取失败 没有消息 继续循环
-                        continue;
-                    }
-                    //获取成功 解析消息
-                    MapRecord<String, Object, Object> record = list.get(0);
-                    Map<Object, Object> values = record.getValue();
-                    VoucherOrder voucherOrder = BeanUtil.fillBeanWithMap(values, new VoucherOrder(), true);
-                    //下单
-                    handleVoucherOrder(voucherOrder);
-                    //ack确认消息
-                    stringRedisTemplate.opsForStream().acknowledge(queueName,"g1",record.getId());
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    handlePendingList();
-                }
-            }
-        });
+        try {
+            seckillOrderExecutor.execute(this::consumeOrders);
+        } catch (Exception e) {
+            log.error("Failed to submit seckill order consumer task: queue={}, group={}, consumer={}",
+                    QUEUE_NAME,
+                    GROUP_NAME,
+                    CONSUMER_NAME,
+                    e);
+            throw new IllegalStateException("Failed to start seckill order consumer", e);
+        }
     }
 
-    private void handlePendingList() {
-        String queueName="stream.orders";
-        while (true){
+    @PreDestroy
+    private void shutdown() {
+        running = false;
+        log.info("Stopping seckill order consumer: queue={}, group={}, consumer={}", QUEUE_NAME, GROUP_NAME, CONSUMER_NAME);
+    }
+
+    private void consumeOrders() {
+        log.info("Started seckill order consumer: thread={}, queue={}, group={}, consumer={}",
+                Thread.currentThread().getName(),
+                QUEUE_NAME,
+                GROUP_NAME,
+                CONSUMER_NAME);
+        while (running) {
             try {
-                //从消息队列中获取订单信息
                 List<MapRecord<String, Object, Object>> list = stringRedisTemplate.opsForStream().read(
-                        Consumer.from("g1", "c1")
-                        , StreamReadOptions.empty().count(1)
-                        , StreamOffset.create(queueName, ReadOffset.from("0"))
+                        Consumer.from(GROUP_NAME, CONSUMER_NAME),
+                        StreamReadOptions.empty().count(1).block(Duration.ofSeconds(2)),
+                        StreamOffset.create(QUEUE_NAME, ReadOffset.lastConsumed())
                 );
-                //判断消息时候获取成功
-                if (list==null||list.isEmpty()){
-                    //获取失败 没有消息 继续循环
-                    break;
+                if (list == null || list.isEmpty()) {
+                    continue;
                 }
-                //获取成功 解析消息
                 MapRecord<String, Object, Object> record = list.get(0);
                 Map<Object, Object> values = record.getValue();
                 VoucherOrder voucherOrder = BeanUtil.fillBeanWithMap(values, new VoucherOrder(), true);
-                //下单
                 handleVoucherOrder(voucherOrder);
-                //ack确认消息
-                stringRedisTemplate.opsForStream().acknowledge(queueName,"g1",record.getId());
+                stringRedisTemplate.opsForStream().acknowledge(QUEUE_NAME, GROUP_NAME, record.getId());
             } catch (Exception e) {
-                e.printStackTrace();
+                if (!running) {
+                    break;
+                }
+                log.error("Seckill order consumer loop failed: queue={}, group={}, consumer={}",
+                        QUEUE_NAME,
+                        GROUP_NAME,
+                        CONSUMER_NAME,
+                        e);
+                handlePendingList();
+            }
+        }
+        log.info("Stopped seckill order consumer: thread={}, queue={}, group={}, consumer={}",
+                Thread.currentThread().getName(),
+                QUEUE_NAME,
+                GROUP_NAME,
+                CONSUMER_NAME);
+    }
+
+    private void handlePendingList() {
+        while (running){
+            try {
+                List<MapRecord<String, Object, Object>> list = stringRedisTemplate.opsForStream().read(
+                        Consumer.from(GROUP_NAME, CONSUMER_NAME),
+                        StreamReadOptions.empty().count(1),
+                        StreamOffset.create(QUEUE_NAME, ReadOffset.from("0"))
+                );
+                if (list==null||list.isEmpty()){
+                    break;
+                }
+                MapRecord<String, Object, Object> record = list.get(0);
+                Map<Object, Object> values = record.getValue();
+                VoucherOrder voucherOrder = BeanUtil.fillBeanWithMap(values, new VoucherOrder(), true);
+                handleVoucherOrder(voucherOrder);
+                stringRedisTemplate.opsForStream().acknowledge(QUEUE_NAME, GROUP_NAME, record.getId());
+            } catch (Exception e) {
+                if (!running) {
+                    break;
+                }
+                log.error("Pending list recovery failed: queue={}, group={}, consumer={}",
+                        QUEUE_NAME,
+                        GROUP_NAME,
+                        CONSUMER_NAME,
+                        e);
                 try {
                     Thread.sleep(20);
                 } catch (InterruptedException ex) {
-                    throw new RuntimeException(ex);
+                    Thread.currentThread().interrupt();
+                    log.warn("Pending list recovery interrupted: queue={}, group={}, consumer={}",
+                            QUEUE_NAME,
+                            GROUP_NAME,
+                            CONSUMER_NAME,
+                            ex);
+                    break;
                 }
             }
         }

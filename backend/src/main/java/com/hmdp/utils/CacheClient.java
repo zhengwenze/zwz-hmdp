@@ -5,15 +5,16 @@ import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
+import com.hmdp.config.AsyncExecutorConfig.CacheRebuildTask;
 import com.hmdp.entity.Shop;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
@@ -29,10 +30,13 @@ import static com.hmdp.utils.RedisConstants.*;
 @Component
 public class CacheClient {
     private final StringRedisTemplate stringRedisTemplate;
+    private final ThreadPoolTaskExecutor cacheRebuildExecutor;
 
     @Autowired
-    public CacheClient(StringRedisTemplate stringRedisTemplate) {
+    public CacheClient(StringRedisTemplate stringRedisTemplate,
+            @Qualifier("cacheRebuildExecutor") ThreadPoolTaskExecutor cacheRebuildExecutor) {
         this.stringRedisTemplate = stringRedisTemplate;
+        this.cacheRebuildExecutor = cacheRebuildExecutor;
     }
 
     /**
@@ -145,28 +149,11 @@ public class CacheClient {
         //是否获取锁成功
         if (flag) {
             //成功 异步重建
-            CACHE_REBUILD_EXECUTOR.submit(() -> {
-                try {
-                    //查询数据库
-                    R newR = dbFallback.apply(id);
-                    //写入redis
-                    this.setWithLogicalExpire(key,newR,time,unit);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                } finally {
-                    //释放锁
-                    unLock(lockKey);
-                }
-            });
+            cacheRebuildExecutor.execute(new CacheRebuildRunnable<>(key, lockKey, id, dbFallback, time, unit));
         }
         //返回过期商铺信息
         return r;
     }
-
-    /**
-     * 简易线程池
-     */
-    private static final ExecutorService CACHE_REBUILD_EXECUTOR = Executors.newFixedThreadPool(10);
 
     /**
      * 获取锁
@@ -186,5 +173,46 @@ public class CacheClient {
      */
     private void unLock(String key) {
         stringRedisTemplate.delete(key);
+    }
+
+    private final class CacheRebuildRunnable<ID, R> implements CacheRebuildTask {
+        private final String cacheKey;
+        private final String lockKey;
+        private final ID id;
+        private final Function<ID, R> dbFallback;
+        private final Long time;
+        private final TimeUnit unit;
+
+        private CacheRebuildRunnable(String cacheKey, String lockKey, ID id, Function<ID, R> dbFallback, Long time,
+                TimeUnit unit) {
+            this.cacheKey = cacheKey;
+            this.lockKey = lockKey;
+            this.id = id;
+            this.dbFallback = dbFallback;
+            this.time = time;
+            this.unit = unit;
+        }
+
+        @Override
+        public String getCacheKey() {
+            return cacheKey;
+        }
+
+        @Override
+        public void onRejected() {
+            unLock(lockKey);
+        }
+
+        @Override
+        public void run() {
+            try {
+                R newR = dbFallback.apply(id);
+                setWithLogicalExpire(cacheKey, newR, time, unit);
+            } catch (Exception e) {
+                log.error("Cache rebuild task failed: cacheKey={}, lockKey={}", cacheKey, lockKey, e);
+            } finally {
+                unLock(lockKey);
+            }
+        }
     }
 }

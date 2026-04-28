@@ -8,10 +8,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import jakarta.validation.ConstraintViolationException;
 
-/**
- * @author CHEN
- * @date 2022/10/07
- */
 @Slf4j
 @RestControllerAdvice
 public class WebExceptionAdvice {

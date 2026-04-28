@@ -1,6 +1,5 @@
 package com.hmdp.controller;
 
-
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
@@ -62,22 +61,25 @@ public class BlogController {
     public Result queryBlogById(@PathVariable("id") Long id) {
         return blogService.queryBlogById(id);
     }
+
     @GetMapping("/likes/{id}")
     public Result queryBlogLikesById(@PathVariable("id") Long id) {
         return blogService.queryBlogLikesById(id);
     }
 
     @GetMapping("/of/user")
-    public Result queryBlogByUserId(@RequestParam(value = "current",defaultValue = "1")Integer current,
-                                    @RequestParam("id")Long id){
+    public Result queryBlogByUserId(@RequestParam(value = "current", defaultValue = "1") Integer current,
+            @RequestParam("id") Long id) {
         Page<Blog> page = blogService.query().eq("user_id", id)
                 .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
 
         List<Blog> records = page.getRecords();
         return Result.ok(records);
     }
+
     @GetMapping("/of/follow")
-    public Result queryBlogOfFollow(@RequestParam("lastId")Long max,@RequestParam(value = "offset",defaultValue = "0")Integer offset){
-        return blogService.queryBlogOfFollow(max,offset);
+    public Result queryBlogOfFollow(@RequestParam("lastId") Long max,
+            @RequestParam(value = "offset", defaultValue = "0") Integer offset) {
+        return blogService.queryBlogOfFollow(max, offset);
     }
 }

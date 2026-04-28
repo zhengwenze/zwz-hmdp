@@ -40,6 +40,7 @@ import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -60,8 +61,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
@@ -96,8 +95,9 @@ public class RagServiceImpl implements IRagService {
     private StringRedisTemplate stringRedisTemplate;
     @Resource
     private ObjectMapper objectMapper;
+    @Resource(name = "ragRebuildExecutor")
+    private ThreadPoolTaskExecutor ragRebuildExecutor;
 
-    private final ExecutorService rebuildExecutor = Executors.newSingleThreadExecutor();
     private final AtomicBoolean rebuilding = new AtomicBoolean(false);
     private final Tika tika = new Tika();
 
@@ -155,13 +155,22 @@ public class RagServiceImpl implements IRagService {
                 .setUpdateTime(LocalDateTime.now());
         knowledgeIngestJobMapper.insert(job);
 
-        rebuildExecutor.submit(() -> {
-            try {
-                runRebuild(job.getId());
-            } finally {
-                rebuilding.set(false);
-            }
-        });
+        try {
+            ragRebuildExecutor.execute(() -> {
+                try {
+                    runRebuild(job.getId());
+                } catch (Exception e) {
+                    log.error("RAG rebuild task execution failed: jobId={}", job.getId(), e);
+                    failJob(job.getId(), "知识库重建执行失败: " + e.getMessage(), job.getStartedTime());
+                } finally {
+                    rebuilding.set(false);
+                }
+            });
+        } catch (Exception e) {
+            log.error("RAG rebuild task submission failed: jobId={}", job.getId(), e);
+            rebuilding.set(false);
+            failJob(job.getId(), "知识库重建任务提交失败: " + e.getMessage(), job.getStartedTime());
+        }
         return toJobDTO(job);
     }
 
