@@ -1,6 +1,7 @@
 package com.hmdp.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.Result;
@@ -18,6 +19,7 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.connection.stream.*;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -28,10 +30,13 @@ import org.springframework.transaction.annotation.Transactional;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
+import java.time.LocalDateTime;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
+import static com.hmdp.utils.RedisConstants.SECKILL_STOCK_KEY;
 
 /**
  * <p>
@@ -69,14 +74,16 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @PostConstruct
     private void init() {
         try {
+            ensureOrderStreamReady();
+            preloadSeckillStockCache();
             seckillOrderExecutor.execute(this::consumeOrders);
         } catch (Exception e) {
-            log.error("Failed to submit seckill order consumer task: queue={}, group={}, consumer={}",
+            log.error("Failed to initialize seckill order infrastructure: queue={}, group={}, consumer={}",
                     QUEUE_NAME,
                     GROUP_NAME,
                     CONSUMER_NAME,
                     e);
-            throw new IllegalStateException("Failed to start seckill order consumer", e);
+            throw new IllegalStateException("Failed to initialize seckill order infrastructure", e);
         }
     }
 
@@ -174,11 +181,20 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         boolean isLock = lock.tryLock();
         //判断是否获取锁成功
         if (!isLock) {
-            //获取失败,返回错误或者重试
-            throw new RuntimeException("发送未知错误");
+            log.warn("Failed to acquire voucher order lock: userId={}, voucherId={}, orderId={}",
+                    userId,
+                    voucherOrder.getVoucherId(),
+                    voucherOrder.getId());
+            throw new IllegalStateException("Failed to acquire voucher order lock");
         }
         try {
             voucherOrderService.createVoucherOrder(voucherOrder);
+        } catch (DuplicateKeyException e) {
+            log.warn("Duplicate voucher order ignored during async consume: userId={}, voucherId={}, orderId={}",
+                    userId,
+                    voucherOrder.getVoucherId(),
+                    voucherOrder.getId(),
+                    e);
         } finally {
             //释放锁
             lock.unlock();
@@ -200,6 +216,17 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
      */
     @Override
     public Result seckillVoucher(Long voucherId) {
+        SeckillVoucher seckillVoucher = seckillVoucherService.getById(voucherId);
+        if (seckillVoucher == null) {
+            return Result.fail("秒杀券不存在");
+        }
+        LocalDateTime now = LocalDateTime.now();
+        if (seckillVoucher.getBeginTime() != null && seckillVoucher.getBeginTime().isAfter(now)) {
+            return Result.fail("秒杀尚未开始");
+        }
+        if (seckillVoucher.getEndTime() != null && seckillVoucher.getEndTime().isBefore(now)) {
+            return Result.fail("秒杀已经结束");
+        }
         //获取用户
         UserDTO user = UserHolder.getUser();
         //获取订单id
@@ -211,6 +238,13 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                 , voucherId.toString()
                 , user.getId().toString()
                 , orderId.toString());
+        if (res == null) {
+            log.error("Seckill script returned null: voucherId={}, userId={}, orderId={}",
+                    voucherId,
+                    user.getId(),
+                    orderId);
+            return Result.fail("秒杀下单失败，请稍后重试");
+        }
         //判断结果是否为0
         int r = res.intValue();
         if (r != 0) {
@@ -340,13 +374,82 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void createVoucherOrder(VoucherOrder voucherOrder) {
+        Long userId = voucherOrder.getUserId();
+        Long voucherId = voucherOrder.getVoucherId();
+        Long count = lambdaQuery()
+                .eq(VoucherOrder::getVoucherId, voucherId)
+                .eq(VoucherOrder::getUserId, userId)
+                .count();
+        if (count > 0) {
+            log.info("Duplicate voucher order skipped: userId={}, voucherId={}, orderId={}",
+                    userId,
+                    voucherId,
+                    voucherOrder.getId());
+            return;
+        }
         //扣减库存
         boolean isSuccess = seckillVoucherService.update(
                 new LambdaUpdateWrapper<SeckillVoucher>()
-                        .eq(SeckillVoucher::getVoucherId, voucherOrder.getVoucherId())
+                        .eq(SeckillVoucher::getVoucherId, voucherId)
                         .gt(SeckillVoucher::getStock, 0)
                         .setSql("stock=stock-1"));
+        if (!isSuccess) {
+            log.warn("Failed to deduct seckill voucher stock: userId={}, voucherId={}, orderId={}",
+                    userId,
+                    voucherId,
+                    voucherOrder.getId());
+            return;
+        }
         //创建订单
-        this.save(voucherOrder);
+        boolean saved = this.save(voucherOrder);
+        if (!saved) {
+            throw new IllegalStateException("Failed to save voucher order");
+        }
+    }
+
+    private void ensureOrderStreamReady() {
+        try {
+            Boolean streamExists = stringRedisTemplate.hasKey(QUEUE_NAME);
+            if (!Boolean.TRUE.equals(streamExists)) {
+                stringRedisTemplate.opsForStream().add(QUEUE_NAME, Collections.singletonMap("bootstrap", "0"));
+                log.info("Created seckill order stream key: queue={}", QUEUE_NAME);
+            }
+            stringRedisTemplate.opsForStream().createGroup(QUEUE_NAME, ReadOffset.latest(), GROUP_NAME);
+            log.info("Created seckill order consumer group: queue={}, group={}", QUEUE_NAME, GROUP_NAME);
+        } catch (Exception e) {
+            if (isBusyGroupException(e)) {
+                log.info("Seckill order consumer group already exists: queue={}, group={}", QUEUE_NAME, GROUP_NAME);
+                return;
+            }
+            log.error("Failed to prepare seckill order stream: queue={}, group={}", QUEUE_NAME, GROUP_NAME, e);
+            throw e;
+        }
+    }
+
+    private void preloadSeckillStockCache() {
+        List<SeckillVoucher> vouchers = seckillVoucherService.list(
+                new LambdaQueryWrapper<SeckillVoucher>()
+                        .select(SeckillVoucher::getVoucherId, SeckillVoucher::getStock));
+        for (SeckillVoucher voucher : vouchers) {
+            String stockKey = SECKILL_STOCK_KEY + voucher.getVoucherId();
+            Boolean initialized = stringRedisTemplate.opsForValue().setIfAbsent(stockKey, String.valueOf(voucher.getStock()));
+            if (Boolean.TRUE.equals(initialized)) {
+                log.info("Preloaded missing seckill stock cache: voucherId={}, stock={}",
+                        voucher.getVoucherId(),
+                        voucher.getStock());
+            }
+        }
+    }
+
+    private boolean isBusyGroupException(Exception e) {
+        Throwable cause = e;
+        while (cause != null) {
+            String message = cause.getMessage();
+            if (message != null && message.contains("BUSYGROUP")) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 }

@@ -119,6 +119,8 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD:
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
       RAG_OLLAMA_BASE_URL: http://host.docker.internal:11434
       RAG_MILVUS_HOST: milvus
       RAG_MILVUS_PORT: 19530
