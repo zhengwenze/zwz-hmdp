@@ -78,16 +78,17 @@ flowchart LR
 
 ## 快速开始
 
-### 方式一：Docker Compose 一键启动
+### 方式一：只用 Docker Compose 一键启动（推荐）
 
 要求：
 
-- Docker
-- Docker Compose
+- 本机已安装 Docker Desktop
+- 不需要本机安装 MySQL、Redis、Maven、Node.js 或 Yarn
 
-启动：
+在项目根目录执行：
 
 ```bash
+cd /path/to/zwz-hmdp
 docker compose up -d --build
 ```
 
@@ -95,6 +96,15 @@ docker compose up -d --build
 
 - 前端：<http://localhost:8080>
 - 后端：<http://localhost:8081>
+
+这条命令会自动完成：
+
+- 拉起 MySQL、Redis 等基础服务容器
+- 初始化数据库 `hmdp`
+- 初始化 Redis Stream 消费者组 `stream.orders` / `g1`
+- 使用 Maven 容器构建后端 Jar
+- 使用 Node/Yarn 容器构建前端静态资源
+- 使用 Nginx 容器托管前端并反向代理后端接口
 
 默认会启动这些服务：
 
@@ -107,12 +117,75 @@ docker compose up -d --build
 - `app`
 - `frontend`
 
+查看启动状态：
+
+```bash
+docker compose ps
+```
+
+查看后端日志：
+
+```bash
+docker compose logs -f app
+```
+
+查看前端 Nginx 日志：
+
+```bash
+docker compose logs -f frontend
+```
+
+停止服务但保留数据：
+
+```bash
+docker compose down
+```
+
+清空容器数据并重新初始化数据库：
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
+注意：`docker compose down -v` 会删除 MySQL、Redis、Milvus 等 Docker volume 中的数据。
+
 建议首次启动后按下面顺序验证：
 
 1. 打开前端首页，确认工作台和登录页可访问。
 2. 调用验证码登录接口，确认 Redis 和 MySQL 均已连通。
 3. 创建或查询商铺，确认基础业务链路可用。
 4. 如果要使用 RAG，再补齐 Ollama 模型并重建索引。
+
+### 快速测试后端接口
+
+项目提供了一个轻量级后端 smoke test 脚本，用来快速检查核心接口是否正常响应。脚本会自动请求验证码、登录获取 token，并测试公开接口和登录态接口。
+
+先确保后端已经启动：
+
+```bash
+docker compose up -d --build
+```
+
+执行接口测试：
+
+```bash
+./scripts/backend-smoke-test.sh
+```
+
+默认测试地址是 `http://localhost:8081`，默认手机号是 `13800138000`。如果端口或手机号不同，可以通过环境变量覆盖：
+
+```bash
+BASE_URL=http://localhost:8081 PHONE=13800138000 ./scripts/backend-smoke-test.sh
+```
+
+默认不会执行会写业务状态的关注/取关和签到接口。如需同时测试这些写接口：
+
+```bash
+RUN_STATEFUL=1 ./scripts/backend-smoke-test.sh
+```
+
+脚本只依赖 `bash` 和 `curl`，不需要本机安装 Maven、MySQL、Redis 或 jq。
 
 ## 本地开发
 
