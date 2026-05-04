@@ -44,7 +44,7 @@ hmdp:
       thread-name-prefix: hmdp-rag-rebuild-
       await-termination-seconds: 60
 rag:
-  enabled: ${RAG_ENABLED:true}
+  enabled: ${RAG_ENABLED:false}
   docs-dir: ${RAG_DOCS_DIR:docs/rag}
   ollama-base-url: ${RAG_OLLAMA_BASE_URL:http://localhost:11434}
   chat-model: ${RAG_CHAT_MODEL:qwen2.5:7b}
