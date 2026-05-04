@@ -39,6 +39,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
@@ -68,6 +69,7 @@ import java.util.stream.Stream;
 
 @Slf4j
 @Service
+@ConditionalOnProperty(prefix = "rag", name = "enabled", havingValue = "true")
 public class RagServiceImpl implements IRagService {
 
     private static final double RRF_K = 60.0D;

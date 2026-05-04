@@ -8,6 +8,7 @@ import com.hmdp.dto.Result;
 import com.hmdp.service.IRagService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,6 +21,7 @@ import java.util.List;
 @Validated
 @RestController
 @RequestMapping("/rag")
+@ConditionalOnProperty(prefix = "rag", name = "enabled", havingValue = "true")
 public class RagController {
 
     @Resource
