@@ -211,7 +211,7 @@ ollama pull qwen3-embedding:0.6b
 ```text
 .
 ├── backend
-│   ├── db/                               # 初始化 SQL
+│   ├── db/
 │   ├── src/main/java/com/hmdp
 │   │   ├── config/                       # Redis、Redisson、RAG、MVC 配置
 │   │   ├── controller/                   # REST API
@@ -230,10 +230,10 @@ ollama pull qwen3-embedding:0.6b
 │   └── rag/                              # RAG 文档知识库目录
 ├── frontend
 │   ├── src
-│   │   ├── components/
+│   │   ├── components/s
 │   │   ├── layout/
-│   │   ├── new_pages/                    # 新版 Element Plus 页面
-│   │   ├── pages/                        # 现有页面入口
+│   │   ├── new_pages/
+│   │   ├── pages/
 │   │   ├── router/
 │   │   ├── services/
 │   │   ├── stores/
@@ -293,7 +293,3 @@ ollama pull qwen3-embedding:0.6b
 - 秒杀关键路径依赖 `seckill.lua`、Redis Stream `stream.orders` 和 Redisson 锁，不建议绕过这些链路做“简化版”改造。
 - 热点店铺缓存依赖 `CacheClient.queryWithLogicalExpire()`；不要把逻辑过期、空值缓存和简单删缓存混为同一种策略。
 - 如果你通过 `docker compose` 访问前端，并计划从前端页面直接使用 RAG API，请检查 [frontend/nginx.conf](./frontend/nginx.conf) 中是否包含 `/rag` 反向代理规则；当前开发环境代理已覆盖 `/rag`，容器内 Nginx 配置需要与你的实际访问路径保持一致。
-
-## License
-
-Apache License 2.0，详见 [LICENSE](./LICENSE)。

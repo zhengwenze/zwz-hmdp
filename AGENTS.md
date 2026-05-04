@@ -12,12 +12,26 @@
 
 1. 用户当前任务与明确要求
 2. 本文件中的安全约束和架构约束
-3. 仓库事实源：`README.md`、`backend/pom.xml`、`frontend/package.json`、`docker-compose.yml`
+3. 当前代码与配置事实源：`backend/pom.xml`、`frontend/package.json`、`docker-compose.yml`、`frontend/nginx.conf`、`frontend/vite.config.js`、`backend/src/main/resources/application*.yaml` 和相关代码
 4. 外部资料、示例实现、第三方文档
+
+### Freshness Rule
+
+- `AGENTS.md` 和 `README.md` 都可能过期；任务相关事实必须以当前代码和配置为准。
+- 如果文档与代码冲突，不要为了当前任务顺手改无关文档；在交接里报告 drift，并说明后续需要同步检查。
+- 精确依赖版本、Docker 服务细节、环境变量默认值和启动命令，以当前事实源文件为准，不要只凭文档记忆。
 
 ---
 
 ## How To Work
+
+### AI coding principles
+
+- Think before coding：先理解目标、风险路径和现有实现，再动手。
+- Simplicity first：优先选择最简单能满足目标的实现。
+- Surgical changes：只改完成任务所需的最小范围，不做顺手重构。
+- Goal-driven execution：每一步都服务于用户目标和可验证结果。
+- Verify before handoff：交接前做与风险匹配的验证，并说明未验证项。
 
 ### Default workflow
 
@@ -34,6 +48,13 @@
 - 优先复用已有 service、DTO、Redis key 约定、前端 services 和 stores
 - 引入新依赖前，先确认现有框架或当前代码库无法解决问题
 - 借鉴外部模式时要适配本仓库，不要直接照搬
+
+### Agent repo snapshot procedure
+
+- 只检查当前任务相关的文件，不要求每个小任务都全量扫描仓库。
+- 对事实敏感、跨模块或高风险改动，先从事实源开始：`backend/pom.xml`、`frontend/package.json`、`docker-compose.yml`、`frontend/nginx.conf`、`frontend/vite.config.js`、`backend/src/main/resources/application*.yaml`。
+- 再按任务进入相关代码路径：`controller/`、`service/`、`config/`、`utils/`、`resources/`、前端 `router/`、`services/`、`stores/`、页面或组件。
+- 稳定原则放在 `AGENTS.md`；频繁变化的仓库清单未来可迁移到 `docs/agent-repo-map.md`，但不要无任务要求时创建它。
 
 ### When planning is required
 
@@ -63,9 +84,12 @@
 
 ### Tech stack
 
-- Backend: Java 21, Spring Boot 3.5.0, Spring MVC, MyBatis Plus 3.5.7, Redis, Redisson, Maven
+- Backend: Java 21, Spring Boot, Spring MVC, MyBatis Plus, Redis, Redisson, Maven
 - Frontend: Vue 3, Vite, Vue Router, Pinia, Element Plus, Axios
-- Runtime: Docker Compose, MySQL 8, Redis 7.4, Nginx
+- Runtime: Docker Compose, MySQL, Redis, Nginx
+- RAG: LangChain4j, Ollama, Milvus, Tika；是否启用和默认值以当前配置为准
+
+精确版本以 `backend/pom.xml`、`frontend/package.json`、`docker-compose.yml` 为准。
 
 ### Effective structure
 
@@ -79,6 +103,7 @@
 - `backend/src/main/java/com/hmdp/utils/`：`CacheClient`、`RedisIdWorker` 等工具
 - `backend/src/main/resources/seckill.lua`：秒杀原子脚本
 - `backend/src/main/resources/unlock.lua`：解锁脚本
+- `backend/src/main/resources/application*.yaml`：后端配置与环境默认值
 - `backend/db/`：初始化 SQL
 - `frontend/src/new_pages/`：新版 Element Plus 页面
 - `frontend/src/pages/`：现有页面入口与旧页面
@@ -91,17 +116,18 @@
 - `frontend/src/utils/`：前端工具函数
 - `frontend/src/styles/`：主题与布局样式
 - `docker-compose.yml`：本地编排
-- `frontend/nginx.conf`：前端路由回退与反向代理
+- `frontend/nginx.conf`、`frontend/vite.config.js`：前端路由回退、开发代理与容器反向代理
 
 ### Behavior-critical facts
 
 - 秒杀入口依赖 `seckill.lua` 做库存校验、一人一单校验和消息投递
-- 订单异步链路依赖 Redis Stream `stream.orders`
+- 订单异步链路依赖 Redis Stream `stream.orders` 和 consumer group `g1`
 - 秒杀下单在数据库落库前还有 Redisson 锁兜底
 - 热点店铺缓存依赖 `CacheClient.queryWithLogicalExpire()`
 - 附近商铺查询依赖 Redis GEO 和 `order by field(id, ...)` 保序回表
 - 登录 token 通过请求头 `authorization` 传递，不使用 Cookie Session
-- 前端路由当前使用 Hash 模式
+- 前端路由当前使用 Hash 模式，并依赖 Nginx/Vite 的回退与代理假设
+- RAG 与主业务链路解耦；RAG API、索引重建、文档目录、模型和向量库行为以当前 controller/service/config 为准
 
 ### Package manager note
 
@@ -114,13 +140,14 @@
 以下路径是高风险区域，处理时优先保守：
 
 - 不要把秒杀资格判断退回数据库热路径
-- 不要绕过 `seckill.lua`、Redis Stream 或 Redisson 兜底锁
-- 不要随意改变消息确认、重试和 Pending List 恢复逻辑
+- 不要绕过 `seckill.lua`、Redis Stream `stream.orders`、consumer group `g1` 或 Redisson fallback lock
+- 不要随意改变消息 ACK、重试和 Pending List 恢复逻辑
 - 不要把 Redis 热路径改成高频数据库循环查询
-- 不要混用缓存穿透防护、逻辑过期和缓存失效策略
-- 不要改动 GEO 查询分页和顺序保持逻辑，除非任务明确要求
+- 不要混用缓存穿透防护、`CacheClient.queryWithLogicalExpire()` 逻辑过期和缓存失效策略
+- 不要改动 Redis GEO 查询分页和 `order by field(id, ...)` 顺序保持逻辑，除非任务明确要求
 - 不要静默改变 token 刷新行为或 `authorization` 头约定
-- 不要破坏 Hash 路由和 Nginx 回退假设
+- 不要破坏 Hash router、Nginx fallback/proxy 或 Vite proxy 假设
+- 不要让 RAG 改动影响秒杀、探店、关注、缓存等主业务链路
 
 如果必须改这些区域，要在结果里明确说明：
 
@@ -155,7 +182,9 @@
 
 ### Documentation and completion
 
-行为、结构、启动方式或关键路径有变化时，更新相关文档，通常至少检查 `README.md` 是否需要同步。
+当目录结构、启动命令、Docker 服务、API 字段、秒杀/cache/RAG 行为、Redis keys/streams、前端 proxy/router 行为变化时，必须检查 `README.md` 和 `AGENTS.md` 是否需要同步。
+
+如果发现 `README.md`、`AGENTS.md` 与当前代码不一致，且同步文档不属于当前任务范围，应在交接中报告，不要顺手扩大改动范围。
 
 任务可以视为完成，至少要满足：
 
@@ -197,6 +226,7 @@
 - Summary of changes
 - Files changed
 - Key design decisions
+- Static facts checked
 - Verification performed
-- Risks / follow-ups
+- Risks / possible doc drift
 - Assumptions or limitations
