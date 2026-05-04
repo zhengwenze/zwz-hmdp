@@ -102,7 +102,7 @@ public class CacheClient {
         R r = dbFallback.apply(id);
         if (r == null) {
             //redis写入空值
-            this.set(key, "", CACHE_NULL_TTL, TimeUnit.SECONDS);
+            stringRedisTemplate.opsForValue().set(key, "", CACHE_NULL_TTL, TimeUnit.SECONDS);
             //数据库不存在 返回错误
             return null;
         }
@@ -128,15 +128,38 @@ public class CacheClient {
         //从redis中查询
         String json = stringRedisTemplate.opsForValue().get(key);
         //判断是否存在
-        if (StringUtils.isEmpty(json)) {
-            //不存在返回空
+        if (json == null) {
+            //未预热时回源数据库，并写入逻辑过期缓存
+            return loadAndSetLogicalExpire(key, id, dbFallback, time, unit);
+        }
+        //判断空值
+        if ("".equals(json)) {
             return null;
         }
-        //命中 反序列化
-        RedisData redisData = JSONUtil.toBean(json, RedisData.class);
-        JSONObject jsonObject = (JSONObject) redisData.getData();
-        R r = BeanUtil.toBean(jsonObject, type);
+
+        RedisData redisData;
+        try {
+            //命中 反序列化
+            redisData = JSONUtil.toBean(json, RedisData.class);
+        } catch (Exception e) {
+            log.warn("Invalid logical cache data, fallback to DB: cacheKey={}", key, e);
+            stringRedisTemplate.delete(key);
+            return loadAndSetLogicalExpire(key, id, dbFallback, time, unit);
+        }
+
         LocalDateTime expireTime = redisData.getExpireTime();
+        if (expireTime == null) {
+            //兼容历史普通 JSON 缓存，读取成功后迁移成逻辑过期结构
+            R r = JSONUtil.toBean(json, type);
+            setWithLogicalExpire(key, r, time, unit);
+            return r;
+        }
+
+        Object data = redisData.getData();
+        if (data == null) {
+            return loadAndSetLogicalExpire(key, id, dbFallback, time, unit);
+        }
+        R r = BeanUtil.toBean((JSONObject) data, type);
         //判断是否过期
         if (expireTime.isAfter(LocalDateTime.now())) {
             //未过期 直接返回
@@ -152,6 +175,17 @@ public class CacheClient {
             cacheRebuildExecutor.execute(new CacheRebuildRunnable<>(key, lockKey, id, dbFallback, time, unit));
         }
         //返回过期商铺信息
+        return r;
+    }
+
+    private <R, ID> R loadAndSetLogicalExpire(String key, ID id, Function<ID, R> dbFallback, Long time,
+            TimeUnit unit) {
+        R r = dbFallback.apply(id);
+        if (r == null) {
+            stringRedisTemplate.opsForValue().set(key, "", CACHE_NULL_TTL, TimeUnit.SECONDS);
+            return null;
+        }
+        setWithLogicalExpire(key, r, time, unit);
         return r;
     }
 
@@ -207,7 +241,11 @@ public class CacheClient {
         public void run() {
             try {
                 R newR = dbFallback.apply(id);
-                setWithLogicalExpire(cacheKey, newR, time, unit);
+                if (newR == null) {
+                    stringRedisTemplate.opsForValue().set(cacheKey, "", CACHE_NULL_TTL, TimeUnit.SECONDS);
+                } else {
+                    setWithLogicalExpire(cacheKey, newR, time, unit);
+                }
             } catch (Exception e) {
                 log.error("Cache rebuild task failed: cacheKey={}, lockKey={}", cacheKey, lockKey, e);
             } finally {
