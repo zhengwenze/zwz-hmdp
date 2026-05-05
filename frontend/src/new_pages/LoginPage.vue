@@ -21,9 +21,9 @@ const redirectTarget = computed(() => {
     : route.query.redirect;
 
   if (
-    typeof raw !== "string"
-    || !raw.startsWith("/")
-    || raw.startsWith("/login")
+    typeof raw !== "string" ||
+    !raw.startsWith("/") ||
+    raw.startsWith("/login")
   ) {
     return "/me";
   }
@@ -129,7 +129,7 @@ onMounted(loadCurrentSession);
           inputmode="tel"
           placeholder="手机号"
           type="tel"
-        >
+        />
       </label>
 
       <label class="login-field">
@@ -141,7 +141,7 @@ onMounted(loadCurrentSession);
             inputmode="numeric"
             placeholder="验证码"
             type="text"
-          >
+          />
           <button
             class="code-button"
             :disabled="countdown > 0 || isCodeLoading"
