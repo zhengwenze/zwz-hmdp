@@ -2,8 +2,8 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { userApi } from "../services/userApi";
-import { clearSession, sessionState } from "../stores/session";
-import { setNotice } from "../stores/appState";
+import { sessionState } from "../stores/session";
+import { isLoading } from "../stores/labState";
 
 const route = useRoute();
 const router = useRouter();
@@ -13,8 +13,7 @@ const form = reactive({
   code: "",
 });
 const countdown = ref(0);
-const agreed = ref(true);
-const lastDevCode = ref("");
+const formError = ref("");
 
 const redirectTarget = computed(() => {
   const raw = Array.isArray(route.query.redirect)
@@ -32,19 +31,15 @@ const redirectTarget = computed(() => {
   return raw;
 });
 
-const buttonText = computed(() =>
-  countdown.value > 0 ? `${countdown.value}s 后可重发` : "发送验证码",
-);
+const isLoginLoading = computed(() => isLoading("POST /user/login"));
+const isCodeLoading = computed(() => isLoading("POST /user/code"));
 
-function startCountdown() {
-  countdown.value = 60;
-  const timer = window.setInterval(() => {
-    countdown.value -= 1;
-    if (countdown.value <= 0) {
-      window.clearInterval(timer);
-    }
-  }, 1000);
-}
+const codeButtonText = computed(() => {
+  if (isCodeLoading.value) {
+    return "发送中";
+  }
+  return countdown.value > 0 ? `${countdown.value}s` : "发送";
+});
 
 async function loadCurrentSession() {
   if (!sessionState.token.value.trim()) {
@@ -56,37 +51,60 @@ async function loadCurrentSession() {
   }
 }
 
+function startCountdown() {
+  countdown.value = 60;
+  const timer = window.setInterval(() => {
+    countdown.value -= 1;
+    if (countdown.value <= 0) {
+      window.clearInterval(timer);
+    }
+  }, 1000);
+}
+
 async function sendCode() {
+  formError.value = "";
+
   if (!form.phone.trim()) {
-    setNotice("error", "请输入手机号。");
+    formError.value = "请输入手机号。";
     return;
   }
 
-  const { data, success } = await userApi.sendCode(form.phone, {
-    successMessage: "验证码请求已发送。",
+  const { data, success } = await userApi.sendCode(form.phone.trim(), {
+    silentError: true,
+    onError: (body) => {
+      formError.value = body?.errorMsg || "发送失败。";
+    },
   });
+
   if (!success) {
     return;
   }
 
   if (typeof data === "string" && data) {
     form.code = data;
-    lastDevCode.value = data;
-  } else {
-    lastDevCode.value = "";
   }
   startCountdown();
 }
 
 async function login() {
-  if (!agreed.value) {
-    setNotice("error", "请先勾选用户协议。");
+  formError.value = "";
+
+  if (!form.phone.trim() || !form.code.trim()) {
+    formError.value = "请填写完整。";
     return;
   }
 
   const { data, success } = await userApi.login(
-    { phone: form.phone, code: form.code },
-    { successMessage: "登录成功。" },
+    {
+      phone: form.phone.trim(),
+      code: form.code.trim(),
+    },
+    {
+      silentError: true,
+      onError: (body) => {
+        formError.value = body?.errorMsg || "登录失败。";
+      },
+    },
   );
   if (!success) {
     return;
@@ -101,66 +119,214 @@ onMounted(loadCurrentSession);
 </script>
 
 <template>
-  <section class="app-page">
-    <ElCard class="page-panel">
-      <template #header>
-        <div>
-          <h1 class="login-card__title">登录 HMDP 工作台</h1>
-          <p class="login-card__desc">
-            登录后即可继续体验用户、关注、秒杀下单和发笔记能力。
-          </p>
-        </div>
-      </template>
-
-      <ElDescriptions :column="2" border>
-        <ElDescriptionsItem label="登录状态">
-          {{ sessionState.token.value.trim() ? "已登录" : "未登录" }}
-        </ElDescriptionsItem>
-        <ElDescriptionsItem label="当前用户">
-          {{ sessionState.currentUser.value?.nickName || "--" }}
-        </ElDescriptionsItem>
-        <ElDescriptionsItem label="跳转目标">
-          {{ redirectTarget }}
-        </ElDescriptionsItem>
-        <ElDescriptionsItem label="开发验证码">
-          {{ lastDevCode || "--" }}
-        </ElDescriptionsItem>
-      </ElDescriptions>
-
-      <ElDivider />
-
-      <ElForm label-position="top">
-        <ElFormItem label="手机号">
-          <ElInput v-model="form.phone" placeholder="13800138000" />
-        </ElFormItem>
-        <ElFormItem label="验证码">
-          <ElInput
-            v-model="form.code"
-            placeholder="请输入 6 位验证码"
-            @keyup.enter="login"
-          />
-        </ElFormItem>
-        <ElFormItem>
-          <ElCheckbox v-model="agreed">
-            我已阅读并同意用户协议与隐私政策
-          </ElCheckbox>
-        </ElFormItem>
-      </ElForm>
-
-      <div class="page-actions">
-        <ElButton :disabled="countdown > 0" @click="sendCode">
-          {{ buttonText }}
-        </ElButton>
-        <ElButton type="primary" @click="login">立即登录</ElButton>
-        <ElButton
-          v-if="sessionState.token.value.trim()"
-          type="info"
-          plain
-          @click="clearSession('本地登录态已清空。')"
+  <section class="login-page">
+    <form class="login-card" @submit.prevent="login">
+      <label class="login-field">
+        <span>手机号</span>
+        <input
+          v-model="form.phone"
+          autocomplete="tel"
+          inputmode="tel"
+          placeholder="手机号"
+          type="tel"
         >
-          清空本地登录态
-        </ElButton>
+      </label>
+
+      <label class="login-field">
+        <span>验证码</span>
+        <div class="code-row">
+          <input
+            v-model="form.code"
+            autocomplete="one-time-code"
+            inputmode="numeric"
+            placeholder="验证码"
+            type="text"
+          >
+          <button
+            class="code-button"
+            :disabled="countdown > 0 || isCodeLoading"
+            type="button"
+            @click="sendCode"
+          >
+            {{ codeButtonText }}
+          </button>
+        </div>
+      </label>
+
+      <p v-if="formError" class="login-error">{{ formError }}</p>
+
+      <button class="login-button" :disabled="isLoginLoading" type="submit">
+        {{ isLoginLoading ? "登录中" : "登录" }}
+      </button>
+
+      <div class="login-links">
+        <a href="#" @click.prevent="formError = '暂未开放。'">忘记密码</a>
+        <a href="#" @click.prevent="formError = '暂未开放。'">注册</a>
       </div>
-    </ElCard>
+    </form>
   </section>
 </template>
+
+<style scoped>
+:global(.blank-layout) {
+  padding: 0;
+  background: #fafafa;
+}
+
+:global(.blank-layout__content) {
+  width: 100%;
+  gap: 0;
+}
+
+.login-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+  background: #fafafa;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 320px;
+  padding: 24px;
+  border: 1px solid #e4e4e7;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(24, 24, 27, 0.06);
+}
+
+.login-field {
+  display: block;
+}
+
+.login-field + .login-field {
+  margin-top: 14px;
+}
+
+.login-field span {
+  display: block;
+  margin-bottom: 6px;
+  color: #52525b;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.login-field input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #d4d4d8;
+  border-radius: 10px;
+  outline: none;
+  background: #ffffff;
+  color: #18181b;
+  font: inherit;
+  font-size: 14px;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.login-field input::placeholder {
+  color: #a1a1aa;
+}
+
+.login-field input:focus {
+  border-color: #18181b;
+  box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.1);
+}
+
+.code-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px;
+  gap: 8px;
+}
+
+.code-button {
+  height: 40px;
+  border: 1px solid #d4d4d8;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #3f3f46;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease;
+}
+
+.code-button:hover:not(:disabled) {
+  border-color: #18181b;
+  color: #18181b;
+}
+
+.code-button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.login-error {
+  min-height: 18px;
+  margin: 12px 0 0;
+  color: #dc2626;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.login-button {
+  width: 100%;
+  height: 40px;
+  margin-top: 16px;
+  border: 0;
+  border-radius: 10px;
+  background: #18181b;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    background 160ms ease,
+    opacity 160ms ease;
+}
+
+.login-button:hover:not(:disabled) {
+  background: #09090b;
+}
+
+.login-button:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.login-links {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 14px;
+  color: #71717a;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.login-links a {
+  color: inherit;
+}
+
+.login-links a:hover {
+  color: #18181b;
+}
+
+@media (max-width: 420px) {
+  .login-page {
+    padding: 16px;
+  }
+
+  .login-card {
+    max-width: 100%;
+    padding: 20px;
+  }
+}
+</style>
