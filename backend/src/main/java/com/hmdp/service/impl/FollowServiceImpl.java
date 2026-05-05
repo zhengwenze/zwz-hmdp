@@ -10,8 +10,9 @@ import com.hmdp.entity.User;
 import com.hmdp.mapper.FollowMapper;
 import com.hmdp.service.IFollowService;
 import com.hmdp.service.IUserService;
-import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.UserHolder;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -30,7 +31,10 @@ import java.util.stream.Collectors;
  * @since 2021-12-22
  */
 @Service
+@Slf4j
 public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> implements IFollowService {
+    private static final String FOLLOW_KEY_PREFIX = "follows:";
+
     @Resource
     private StringRedisTemplate stringRedisTemplate;
     @Resource
@@ -42,25 +46,33 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
         Long id = UserHolder.getUser().getId();
         //判断是关注还是取关
         if (isFollow) {
-            //关注 新增数据
-            Follow follow=new Follow();
-            follow.setFollowUserId(followUserId);
-            follow.setUserId(id);
-            boolean isSuccess = save(follow);
-            if (isSuccess){
-                String key="follows:"+id;
-                stringRedisTemplate.opsForSet().add(key,followUserId.toString());
+            Long count = lambdaQuery()
+                    .eq(Follow::getUserId, id)
+                    .eq(Follow::getFollowUserId, followUserId)
+                    .count();
+            if (count > 0) {
+                cacheFollow(id, followUserId);
+                return Result.ok();
             }
-        }else {
+            try {
+                //关注 新增数据
+                Follow follow = new Follow();
+                follow.setFollowUserId(followUserId);
+                follow.setUserId(id);
+                if (save(follow)) {
+                    cacheFollow(id, followUserId);
+                }
+            } catch (DuplicateKeyException e) {
+                // 并发重复关注时，数据库唯一约束会拒绝第二次插入；这里按幂等成功处理。
+                cacheFollow(id, followUserId);
+            }
+        } else {
             //取关 删除
-            boolean isSuccess = remove(new LambdaQueryWrapper<Follow>()
+            remove(new LambdaQueryWrapper<Follow>()
                     .eq(Follow::getUserId, id)
                     .eq(Follow::getFollowUserId, followUserId)
             );
-            if (isSuccess) {
-                String key="follows:"+id;
-                stringRedisTemplate.opsForSet().remove(key,followUserId);
-            }
+            evictFollowCache(id, followUserId);
         }
         return Result.ok();
     }
@@ -74,18 +86,18 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
                 .eq(Follow::getUserId, id)
                 .eq(Follow::getFollowUserId, followUserId)
                 .count();
-        return Result.ok(count>0);
+        return Result.ok(count > 0);
     }
 
     @Override
     public Result followCommons(Long id) {
         //获取登陆用户
         Long userId = UserHolder.getUser().getId();
-        String key="follows:"+userId;
+        String key = FOLLOW_KEY_PREFIX + userId;
         //求交集
-        String key2="follows:"+id;
+        String key2 = FOLLOW_KEY_PREFIX + id;
         Set<String> intersect = stringRedisTemplate.opsForSet().intersect(key, key2);
-        if (intersect==null||intersect.isEmpty()) {
+        if (intersect == null || intersect.isEmpty()) {
             return Result.ok(Collections.emptyList());
         }
         //解析出id
@@ -96,5 +108,21 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
                 .map(user -> BeanUtil.copyProperties(user, UserDTO.class))
                 .collect(Collectors.toList());
         return Result.ok(collect);
+    }
+
+    private void cacheFollow(Long userId, Long followUserId) {
+        try {
+            stringRedisTemplate.opsForSet().add(FOLLOW_KEY_PREFIX + userId, followUserId.toString());
+        } catch (Exception e) {
+            log.warn("Failed to cache follow relation: userId={}, followUserId={}", userId, followUserId, e);
+        }
+    }
+
+    private void evictFollowCache(Long userId, Long followUserId) {
+        try {
+            stringRedisTemplate.opsForSet().remove(FOLLOW_KEY_PREFIX + userId, followUserId.toString());
+        } catch (Exception e) {
+            log.warn("Failed to evict follow relation cache: userId={}, followUserId={}", userId, followUserId, e);
+        }
     }
 }
