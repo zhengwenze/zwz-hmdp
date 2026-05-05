@@ -49,7 +49,6 @@ const moduleCards = [
         <div class="page-panel__header">
           <div>
             <h3 class="page-panel__title">模块入口</h3>
-            <p class="page-panel__hint">后续新增页面直接挂到统一路由和统一壳子中。</p>
           </div>
         </div>
       </template>

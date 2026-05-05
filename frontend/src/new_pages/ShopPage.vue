@@ -128,9 +128,6 @@ onMounted(async () => {
         <div class="page-panel__header">
           <div>
             <h2 class="page-panel__title">商铺列表模板页</h2>
-            <p class="page-panel__hint">
-              这张页作为标准列表页示例，统一包含筛选区、表格区和分页区。
-            </p>
           </div>
           <div class="page-actions">
             <ElButton @click="loadShopTypes">刷新分类</ElButton>

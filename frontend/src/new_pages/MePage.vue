@@ -99,9 +99,6 @@ onMounted(loadMe);
         <div class="page-panel__header">
           <div>
             <h2 class="page-panel__title">当前用户</h2>
-            <p class="page-panel__hint">
-              用户模块只负责当前会话、签到、昵称修改和退出登录。
-            </p>
           </div>
           <div class="page-actions">
             <ElButton @click="loadMe">刷新</ElButton>

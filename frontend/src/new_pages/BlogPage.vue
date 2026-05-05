@@ -227,9 +227,6 @@ onMounted(fetchHotBlogs);
         <div class="page-panel__header">
           <div>
             <h2 class="page-panel__title">笔记管理</h2>
-            <p class="page-panel__hint">
-              通过标签页收口发布、热门、个人笔记与详情查询，避免页面失控扩张。
-            </p>
           </div>
           <div class="page-actions">
             <ElButton @click="fetchHotBlogs">刷新热门</ElButton>
