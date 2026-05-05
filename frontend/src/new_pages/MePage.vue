@@ -10,7 +10,6 @@ import {
 } from "../stores/session";
 
 const router = useRouter();
-const userInfo = ref(null);
 const signCount = ref("--");
 const nicknameDialogVisible = ref(false);
 const newNickname = ref("");
@@ -19,7 +18,6 @@ const userId = computed(() => sessionState.currentUser.value?.id);
 
 async function loadMe() {
   if (!isAuthenticated()) {
-    userInfo.value = null;
     signCount.value = "--";
     sessionState.currentUser.value = null;
     return;
@@ -33,12 +31,6 @@ async function loadMe() {
   sessionState.currentUser.value = meResult.data;
 
   await Promise.all([
-    userApi.fetchUserInfo(meResult.data.id, {
-      silentError: true,
-      onSuccess: (data) => {
-        userInfo.value = data || null;
-      },
-    }),
     userApi.fetchSignCount({
       silentError: true,
       onSuccess: (data) => {
@@ -93,7 +85,6 @@ async function submitNicknameUpdate() {
 async function handleLogout() {
   await userApi.logout({ silentError: true });
   clearSession("已退出登录。");
-  userInfo.value = null;
   signCount.value = "--";
   router.push("/login");
 }
@@ -147,33 +138,6 @@ onMounted(loadMe);
           {{ signCount }}
         </ElDescriptionsItem>
       </ElDescriptions>
-    </ElCard>
-
-    <ElCard class="page-panel">
-      <template #header>
-        <div class="page-panel__header">
-          <div>
-            <h3 class="page-panel__title">用户详情</h3>
-            <p class="page-panel__hint">来自 `/user/info/{id}` 的扩展信息。</p>
-          </div>
-        </div>
-      </template>
-
-      <ElDescriptions v-if="userInfo" :column="2" border>
-        <ElDescriptionsItem label="简介">
-          {{ userInfo?.introduce || "暂无简介" }}
-        </ElDescriptionsItem>
-        <ElDescriptionsItem label="性别">
-          {{ userInfo?.gender ?? "未填写" }}
-        </ElDescriptionsItem>
-        <ElDescriptionsItem label="粉丝">
-          {{ userInfo?.fans ?? 0 }}
-        </ElDescriptionsItem>
-        <ElDescriptionsItem label="关注">
-          {{ userInfo?.followee ?? 0 }}
-        </ElDescriptionsItem>
-      </ElDescriptions>
-      <ElEmpty v-else description="暂无用户详情数据。" />
     </ElCard>
 
     <ElDialog
