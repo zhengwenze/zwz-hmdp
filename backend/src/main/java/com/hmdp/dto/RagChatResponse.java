@@ -11,6 +11,7 @@ import java.util.List;
 @AllArgsConstructor
 public class RagChatResponse {
     private String answer;
+    private List<RagReferenceDTO> references;
     private List<RagCitationDTO> citations;
     private Boolean grounded;
     private String traceId;

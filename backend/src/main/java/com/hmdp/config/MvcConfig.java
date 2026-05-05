@@ -29,7 +29,8 @@ public class MvcConfig implements WebMvcConfigurer {
                 registry
                                 .addInterceptor(new LoginInterceptor())
                                 .excludePathPatterns("/user/code", "/user/login", "/blog/hot", "/shop/**",
-                                                "/shop-type/**", "/upload/**", "/voucher/**", "/blogs/**")
+                                                "/shop-type/**", "/upload/**", "/voucher/**", "/blogs/**",
+                                                "/rag/chat", "/rag/status", "/rag/rebuild")
                                 .order(1);
                 // Token续命拦截器
                 registry

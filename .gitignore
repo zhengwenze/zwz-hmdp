@@ -34,4 +34,6 @@ build/
 
 ### Temp directories ###
 .tmp/
-docs/
+docs/*
+!docs/rag/
+!docs/rag/**

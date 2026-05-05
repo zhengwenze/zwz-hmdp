@@ -49,6 +49,7 @@ rag:
   ollama-base-url: ${RAG_OLLAMA_BASE_URL:http://localhost:11434}
   chat-model: ${RAG_CHAT_MODEL:qwen2.5:7b}
   embedding-model: ${RAG_EMBEDDING_MODEL:qwen3-embedding:0.6b}
+  embedding-dimension: ${RAG_EMBEDDING_DIMENSION:1024}
   milvus:
     host: ${RAG_MILVUS_HOST:127.0.0.1}
     port: ${RAG_MILVUS_PORT:19530}

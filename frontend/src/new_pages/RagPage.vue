@@ -9,6 +9,7 @@ const sessionId = ref(readSessionId());
 const question = ref("");
 const sending = ref(false);
 const rebuilding = ref(false);
+const status = ref(null);
 const latestJob = ref(null);
 const documents = ref([]);
 const conversations = ref([]);
@@ -21,7 +22,7 @@ const failedCount = computed(
   () => documents.value.filter((item) => item.status === "FAILED").length,
 );
 const running = computed(
-  () => latestJob.value?.status === "RUNNING",
+  () => status.value?.rebuilding || latestJob.value?.status === "RUNNING",
 );
 
 function readSessionId() {
@@ -35,11 +36,16 @@ function readSessionId() {
 }
 
 async function loadStatus() {
-  const [docsResult, jobResult] = await Promise.all([
+  const [statusResult, docsResult, jobResult] = await Promise.all([
+    ragApi.fetchStatus({ silentError: true }),
     ragApi.fetchDocuments({ silentError: true }),
     ragApi.fetchLatestJob({ silentError: true }),
   ]);
 
+  if (statusResult.success) {
+    status.value = statusResult.data || null;
+    latestJob.value = status.value?.latestJob || latestJob.value;
+  }
   if (docsResult.success) {
     documents.value = docsResult.data || [];
   }
@@ -76,6 +82,7 @@ async function sendQuestion() {
   conversations.value.push({
     role: "user",
     content: userQuestion,
+    references: [],
     citations: [],
     traceId: "",
   });
@@ -88,6 +95,7 @@ async function sendQuestion() {
     conversations.value.push({
       role: "assistant",
       content: data.answer || "暂无回答",
+      references: data.references || [],
       citations: data.citations || [],
       traceId: data.traceId || "",
     });
@@ -132,23 +140,23 @@ onUnmounted(() => {
     <div class="stats-grid">
       <ElCard shadow="never" class="stat-card">
         <span class="stat-card__label">知识文档</span>
-        <p class="stat-card__value">{{ documents.length }}</p>
+        <p class="stat-card__value">{{ status?.documentCount ?? documents.length }}</p>
         <p class="stat-card__desc">当前纳入索引管理的文档总数。</p>
       </ElCard>
       <ElCard shadow="never" class="stat-card">
         <span class="stat-card__label">可检索文档</span>
-        <p class="stat-card__value">{{ readyCount }}</p>
+        <p class="stat-card__value">{{ status?.readyDocumentCount ?? readyCount }}</p>
         <p class="stat-card__desc">状态为 READY 的文档会参与问答召回。</p>
       </ElCard>
       <ElCard shadow="never" class="stat-card">
         <span class="stat-card__label">失败文档</span>
-        <p class="stat-card__value">{{ failedCount }}</p>
+        <p class="stat-card__value">{{ status?.failedDocumentCount ?? failedCount }}</p>
         <p class="stat-card__desc">处理失败文档需要检查格式或内容是否为空。</p>
       </ElCard>
       <ElCard shadow="never" class="stat-card">
-        <span class="stat-card__label">会话标识</span>
-        <p class="stat-card__value rag-session">{{ sessionId }}</p>
-        <p class="stat-card__desc">后端用它关联最近 6 轮对话上下文。</p>
+        <span class="stat-card__label">向量切片</span>
+        <p class="stat-card__value">{{ status?.chunkCount ?? "--" }}</p>
+        <p class="stat-card__desc">当前写入知识库索引的切片数量。</p>
       </ElCard>
     </div>
 
@@ -158,7 +166,9 @@ onUnmounted(() => {
           <div>
             <h2 class="page-panel__title">RAG 智能客服</h2>
             <p class="page-panel__hint">
-              文档目录固定为 <code>docs/rag</code>，模型依赖本地 Ollama，向量库依赖 Milvus。
+              文档目录 <code>{{ status?.docsDir || "docs/rag" }}</code>，模型
+              {{ status?.chatModel || "qwen2.5:7b" }} /
+              {{ status?.embeddingModel || "qwen3-embedding:0.6b" }}。
             </p>
           </div>
           <div class="page-actions">
@@ -191,13 +201,21 @@ onUnmounted(() => {
                     <span v-if="item.traceId" class="rag-bubble__trace">{{ item.traceId }}</span>
                   </div>
                   <p class="rag-bubble__content">{{ item.content }}</p>
-                  <div v-if="item.citations?.length" class="rag-citations">
-                    <ElTag
-                      v-for="citation in item.citations"
-                      :key="citation.chunkId"
-                      effect="plain"
-                      type="success"
+                  <div v-if="item.references?.length" class="rag-references">
+                    <div
+                      v-for="reference in item.references"
+                      :key="reference.chunkId"
+                      class="rag-reference"
                     >
+                      <div class="rag-reference__meta">
+                        <strong>{{ reference.source }}</strong>
+                        <span>score {{ Number(reference.score || 0).toFixed(3) }}</span>
+                      </div>
+                      <p>{{ reference.content }}</p>
+                    </div>
+                  </div>
+                  <div v-else-if="item.citations?.length" class="rag-citations">
+                    <ElTag v-for="citation in item.citations" :key="citation.chunkId" effect="plain" type="success">
                       {{ citation.fileName }}{{ citation.section ? ` / ${citation.section}` : "" }}
                     </ElTag>
                   </div>
@@ -235,6 +253,12 @@ onUnmounted(() => {
               <ElDescriptions :column="1" border>
                 <ElDescriptionsItem label="状态">
                   {{ latestJob?.status || "--" }}
+                </ElDescriptionsItem>
+                <ElDescriptionsItem label="RAG 启用">
+                  {{ status?.enabled ? "是" : "否" }}
+                </ElDescriptionsItem>
+                <ElDescriptionsItem label="向量维度">
+                  {{ status?.embeddingDimension || "--" }}
                 </ElDescriptionsItem>
                 <ElDescriptionsItem label="开始时间">
                   {{ prettyTime(latestJob?.startedTime) }}
@@ -336,6 +360,34 @@ onUnmounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.rag-references {
+  display: grid;
+  gap: 10px;
+}
+
+.rag-reference {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(22, 163, 74, 0.18);
+  border-radius: 8px;
+  background: rgba(22, 163, 74, 0.05);
+}
+
+.rag-reference__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--app-text-muted);
+}
+
+.rag-reference p {
+  margin: 0;
+  line-height: 1.7;
+  color: var(--app-text-secondary);
 }
 
 .rag-session {

@@ -10,8 +10,15 @@ export const ragApi = {
   },
   rebuildIndex(options = {}) {
     return apiRequest(
-      "POST /rag/index/rebuild",
-      { method: "POST", path: "/rag/index/rebuild" },
+      "POST /rag/rebuild",
+      { method: "POST", path: "/rag/rebuild" },
+      options,
+    );
+  },
+  fetchStatus(options = {}) {
+    return apiRequest(
+      "GET /rag/status",
+      { method: "GET", path: "/rag/status" },
       options,
     );
   },

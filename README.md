@@ -236,6 +236,7 @@ yarn dev
 - 默认文档目录：`docs/rag`
 - 默认对话模型：`qwen2.5:7b`
 - 默认向量模型：`qwen3-embedding:0.6b`
+- 默认向量维度：`1024`
 - 默认 Ollama 地址：`http://localhost:11434`
 
 如果你在宿主机安装了 Ollama，常见准备方式是：
@@ -248,8 +249,15 @@ ollama pull qwen3-embedding:0.6b
 ### 使用建议
 
 - 业务主链路不依赖 RAG；即使暂时不用知识库功能，也可以先跑通秒杀、商铺、博客、关注等模块。
-- 文档内容尽量按“一个小节讲一件事”的方式组织，这样更利于切片和召回。仓库内有一份示例说明：[docs/rag/README.md](./docs/rag/README.md)。
+- 文档内容尽量按“一个小节讲一件事”的方式组织，这样更利于切片和召回。仓库内有一份示例说明：[docs/rag/hmdp-seckill-guide.md](./docs/rag/hmdp-seckill-guide.md)。
 - Docker Compose 中后端默认通过 `host.docker.internal:11434` 访问宿主机 Ollama。这个配置对 macOS / Windows 比较直接；如果你在 Linux 上运行，通常需要自行调整 `RAG_OLLAMA_BASE_URL`。
+- 当前 V1 面向本地开发演示，`/rag/rebuild` 暂时公开，生产环境应增加管理员鉴权，避免任意用户触发知识库重建。
+
+### 后端接口
+
+- `GET /rag/status`：查看 RAG 启用状态、文档目录、模型配置、文档数量、切片数量和最近重建任务。
+- `POST /rag/rebuild`：异步重建 `docs/rag` 知识库索引。
+- `POST /rag/chat`：基于知识库片段回答问题，并返回 `answer`、`references` 和兼容字段 `citations`。
 
 ## 关键配置
 
@@ -270,6 +278,7 @@ ollama pull qwen3-embedding:0.6b
 | `RAG_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama 地址            |
 | `RAG_MILVUS_HOST`     | `127.0.0.1`              | Milvus 地址            |
 | `RAG_MILVUS_PORT`     | `19530`                  | Milvus 端口            |
+| `RAG_EMBEDDING_DIMENSION` | `1024`              | 向量模型输出维度       |
 
 另外，后端业务异步线程池支持通过 `hmdp.async.*` 配置：
 

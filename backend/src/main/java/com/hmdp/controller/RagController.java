@@ -5,9 +5,11 @@ import com.hmdp.dto.RagChatResponse;
 import com.hmdp.dto.RagDocumentDTO;
 import com.hmdp.dto.RagIngestJobDTO;
 import com.hmdp.dto.Result;
+import com.hmdp.dto.RagStatusDTO;
 import com.hmdp.service.IRagService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+@Slf4j
 @Validated
 @RestController
 @RequestMapping("/rag")
@@ -29,14 +32,40 @@ public class RagController {
 
     @PostMapping("/chat")
     public Result chat(@Valid @RequestBody RagChatRequest request) {
-        RagChatResponse response = ragService.chat(request);
-        return Result.ok(response);
+        try {
+            RagChatResponse response = ragService.chat(request);
+            return Result.ok(response);
+        } catch (RuntimeException e) {
+            log.error("RAG chat failed: question={}", request.getQuestion(), e);
+            return Result.fail(e.getMessage());
+        }
+    }
+
+    @GetMapping("/status")
+    public Result status() {
+        try {
+            RagStatusDTO status = ragService.status();
+            return Result.ok(status);
+        } catch (RuntimeException e) {
+            log.error("RAG status failed", e);
+            return Result.fail(e.getMessage());
+        }
+    }
+
+    @PostMapping("/rebuild")
+    public Result rebuild() {
+        return rebuildIndex();
     }
 
     @PostMapping("/index/rebuild")
     public Result rebuildIndex() {
-        RagIngestJobDTO job = ragService.rebuildIndex();
-        return Result.ok(job);
+        try {
+            RagIngestJobDTO job = ragService.rebuildIndex();
+            return Result.ok(job);
+        } catch (RuntimeException e) {
+            log.error("RAG rebuild submit failed", e);
+            return Result.fail(e.getMessage());
+        }
     }
 
     @GetMapping("/documents")

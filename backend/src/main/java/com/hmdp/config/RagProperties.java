@@ -12,6 +12,7 @@ public class RagProperties {
     private String ollamaBaseUrl = "http://localhost:11434";
     private String chatModel = "qwen2.5:7b";
     private String embeddingModel = "qwen3-embedding:0.6b";
+    private int embeddingDimension = 1024;
     private int maxSegmentSize = 500;
     private int maxSegmentOverlap = 100;
     private int maxDenseResults = 8;
