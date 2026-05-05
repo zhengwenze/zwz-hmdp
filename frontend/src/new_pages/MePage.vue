@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { userApi } from "../services/userApi";
+import { setNotice } from "../stores/appState";
 import {
   buildRedirectPath,
   clearSession,
@@ -65,17 +66,30 @@ async function submitNicknameUpdate() {
     jumpToLogin();
     return;
   }
-  if (!newNickname.value.trim()) {
+
+  const trimmedNickname = newNickname.value.trim();
+  const currentNickname = (sessionState.currentUser.value?.nickName || "").trim();
+
+  if (!trimmedNickname) {
+    setNotice("error", "昵称不能为空");
+    return;
+  }
+  if (trimmedNickname.length < 2 || trimmedNickname.length > 20) {
+    setNotice("error", "昵称长度应为 2-20 个字符");
+    return;
+  }
+  if (trimmedNickname === currentNickname) {
+    setNotice("error", "新昵称不能与当前昵称相同");
     return;
   }
 
-  const { success } = await userApi.updateNickName(newNickname.value.trim(), {
+  const { success } = await userApi.updateNickName(trimmedNickname, {
     successMessage: "昵称修改成功。",
   });
   if (success) {
     sessionState.currentUser.value = {
       ...sessionState.currentUser.value,
-      nickName: newNickname.value.trim(),
+      nickName: trimmedNickname,
     };
     nicknameDialogVisible.value = false;
     await loadMe();
