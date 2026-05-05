@@ -35,5 +35,6 @@ build/
 ### Temp directories ###
 .tmp/
 docs/*
+!docs/database-review.md
 !docs/rag/
 !docs/rag/**

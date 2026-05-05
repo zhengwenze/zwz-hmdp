@@ -187,6 +187,29 @@ RUN_STATEFUL=1 ./scripts/backend-smoke-test.sh
 
 脚本只依赖 `bash` 和 `curl`，不需要本机安装 Maven、MySQL、Redis 或 jq。
 
+### 运行后端自动化测试
+
+本机不需要安装 Maven。仓库提供了 `maven-test` Compose service，用 Maven 容器在同一个 Docker Compose 网络中执行后端测试，并通过服务名连接 MySQL 和 Redis。
+
+先确保基础服务可用：
+
+```bash
+docker compose up -d mysql redis redis-init
+```
+
+执行测试：
+
+```bash
+docker compose run --rm maven-test mvn test
+```
+
+接口烟测仍然使用正常运行环境验证真实链路：
+
+```bash
+docker compose up -d --build
+./scripts/backend-smoke-test.sh
+```
+
 ## 本地开发
 
 ### 1. 启动基础依赖
@@ -263,22 +286,22 @@ ollama pull qwen3-embedding:0.6b
 
 常用环境变量如下：
 
-| 变量                  | 默认值                   | 说明                   |
-| --------------------- | ------------------------ | ---------------------- |
-| `SERVER_PORT`         | `8081`                   | 后端端口               |
-| `MYSQL_HOST`          | `127.0.0.1`              | MySQL 主机             |
-| `MYSQL_PORT`          | `3306`                   | MySQL 端口             |
-| `MYSQL_DATABASE`      | `hmdp`                   | 数据库名               |
-| `MYSQL_USER`          | `root`                   | 数据库用户             |
-| `MYSQL_PASSWORD`      | `root`                   | 数据库密码             |
-| `REDIS_HOST`          | `localhost`              | Redis 主机             |
-| `REDIS_PORT`          | `6379`                   | Redis 端口             |
-| `RAG_ENABLED`         | `true`                   | 是否启用 RAG 相关 Bean |
-| `RAG_DOCS_DIR`        | `docs/rag`               | 知识库文档目录         |
-| `RAG_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama 地址            |
-| `RAG_MILVUS_HOST`     | `127.0.0.1`              | Milvus 地址            |
-| `RAG_MILVUS_PORT`     | `19530`                  | Milvus 端口            |
-| `RAG_EMBEDDING_DIMENSION` | `1024`              | 向量模型输出维度       |
+| 变量                      | 默认值                   | 说明                   |
+| ------------------------- | ------------------------ | ---------------------- |
+| `SERVER_PORT`             | `8081`                   | 后端端口               |
+| `MYSQL_HOST`              | `127.0.0.1`              | MySQL 主机             |
+| `MYSQL_PORT`              | `3306`                   | MySQL 端口             |
+| `MYSQL_DATABASE`          | `hmdp`                   | 数据库名               |
+| `MYSQL_USER`              | `root`                   | 数据库用户             |
+| `MYSQL_PASSWORD`          | `root`                   | 数据库密码             |
+| `REDIS_HOST`              | `localhost`              | Redis 主机             |
+| `REDIS_PORT`              | `6379`                   | Redis 端口             |
+| `RAG_ENABLED`             | `true`                   | 是否启用 RAG 相关 Bean |
+| `RAG_DOCS_DIR`            | `docs/rag`               | 知识库文档目录         |
+| `RAG_OLLAMA_BASE_URL`     | `http://localhost:11434` | Ollama 地址            |
+| `RAG_MILVUS_HOST`         | `127.0.0.1`              | Milvus 地址            |
+| `RAG_MILVUS_PORT`         | `19530`                  | Milvus 端口            |
+| `RAG_EMBEDDING_DIMENSION` | `1024`                   | 向量模型输出维度       |
 
 另外，后端业务异步线程池支持通过 `hmdp.async.*` 配置：
 
@@ -375,3 +398,11 @@ ollama pull qwen3-embedding:0.6b
 - 秒杀关键路径依赖 `seckill.lua`、Redis Stream `stream.orders` 和 Redisson 锁，不建议绕过这些链路做“简化版”改造。
 - 热点店铺缓存依赖 `CacheClient.queryWithLogicalExpire()`；不要把逻辑过期、空值缓存和简单删缓存混为同一种策略。
 - 如果你通过 `docker compose` 访问前端，并计划从前端页面直接使用 RAG API，请检查 [frontend/nginx.conf](./frontend/nginx.conf) 中是否包含 `/rag` 反向代理规则；当前开发环境代理已覆盖 `/rag`，容器内 Nginx 配置需要与你的实际访问路径保持一致。
+
+## 项目工程化能力
+
+本项目使用 Docker Compose 管理开发运行环境；
+使用独立 Maven test runner 在相同 Compose 网络内执行自动化测试；
+接口烟测验证真实运行链路；
+JUnit 测试验证核心业务逻辑和回归风险；
+避免依赖本机 Maven、MySQL、Redis 环境。

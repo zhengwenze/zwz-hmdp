@@ -1,11 +1,14 @@
 package com.hmdp.controller;
 
 import com.hmdp.dto.Result;
+import com.hmdp.config.MvcConfig;
 import com.hmdp.service.IShopService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.Mockito.when;
@@ -14,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ShopController.class)
+@ContextConfiguration(classes = {ShopController.class, MvcConfig.class})
 class ShopControllerTest {
 
     @Autowired
@@ -21,6 +25,9 @@ class ShopControllerTest {
 
     @MockBean
     private IShopService shopService;
+
+    @MockBean
+    private StringRedisTemplate stringRedisTemplate;
 
     @Test
     void queryShopByIdShouldReturnWrappedResult() throws Exception {

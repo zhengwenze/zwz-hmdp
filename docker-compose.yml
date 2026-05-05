@@ -136,6 +136,35 @@ services:
     volumes:
       - ./docs:/app/docs:ro
 
+  maven-test:
+    image: maven:3.9-eclipse-temurin-21
+    profiles:
+      - test
+    working_dir: /workspace
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      redis-init:
+        condition: service_completed_successfully
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: hmdp
+      MYSQL_USER: root
+      MYSQL_PASSWORD: "root"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD:
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      RAG_ENABLED: "false"
+    volumes:
+      - ./backend:/workspace
+      - ${HOME}/.m2:/root/.m2
+    command: mvn test
+
   frontend:
     build:
       context: .
