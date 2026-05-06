@@ -58,6 +58,13 @@ public interface IUserService extends IService<User> {
     Result signCount();
 
     /**
+     * 获取当月签到日历
+     *
+     * @return {@link Result}
+     */
+    Result getSignCalendar();
+
+    /**
      * 更新用户昵称
      *
      * @param nickName 新昵称

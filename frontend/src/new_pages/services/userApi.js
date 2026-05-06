@@ -59,6 +59,13 @@ export const userApi = {
     });
   },
 
+  fetchSignCalendar() {
+    return apiClient({
+      method: "GET",
+      path: "/user/sign/month",
+    });
+  },
+
   updateNickName(nickName) {
     return apiClient({
       method: "PUT",

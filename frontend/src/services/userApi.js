@@ -57,6 +57,13 @@ export const userApi = {
       options,
     );
   },
+  fetchSignCalendar(options = {}) {
+    return apiRequest(
+      "GET /user/sign/month",
+      { method: "GET", path: "/user/sign/month" },
+      options,
+    );
+  },
   updateNickName(nickName, options = {}) {
     return apiRequest(
       "PUT /user/nickname",

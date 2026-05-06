@@ -63,7 +63,7 @@ public class UserController {
 
     @GetMapping("/info/{id}")
     public Result info(@PathVariable("id") Long userId) {
-        // 查询详情
+        // 查询用户详情
         UserInfo info = userInfoService.getById(userId);
         if (info == null) {
             // 没有详情，应该是第一次查看详情
@@ -71,7 +71,7 @@ public class UserController {
         }
         info.setCreateTime(null);
         info.setUpdateTime(null);
-        // 返回
+        // 返回用户详情
         return Result.ok(info);
     }
 
@@ -85,16 +85,33 @@ public class UserController {
         return Result.ok(userDTO);
     }
 
+    /**
+     * 用户签到
+     */
     @PostMapping("/sign")
     public Result sign() {
         return userService.sign();
     }
 
+    /**
+     * 获取用户连续签到天数
+     */
     @GetMapping("/sign/count")
     public Result signCount() {
         return userService.signCount();
     }
 
+    /**
+     * 获取用户当前月签到日历
+     */
+    @GetMapping("/sign/month")
+    public Result getSignCalendar() {
+        return userService.getSignCalendar();
+    }
+
+    /**
+     * 更新用户昵称
+     */
     @PutMapping("/nickname")
     public Result updateNickName(@RequestParam("nickName") String nickName,
             @RequestHeader(value = "authorization", required = false) String token) {

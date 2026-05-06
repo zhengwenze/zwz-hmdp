@@ -7,6 +7,7 @@ export const endpointCatalog = [
   { key: "GET /user/{id}", module: "用户", label: "用户基础信息" },
   { key: "POST /user/sign", module: "用户", label: "签到" },
   { key: "GET /user/sign/count", module: "用户", label: "连续签到天数" },
+  { key: "GET /user/sign/month", module: "用户", label: "当月签到日历" },
   { key: "GET /shop/{id}", module: "商铺", label: "商铺详情" },
   { key: "POST /shop", module: "商铺", label: "新增商铺" },
   { key: "PUT /shop", module: "商铺", label: "更新商铺" },

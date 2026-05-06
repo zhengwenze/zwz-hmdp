@@ -12,14 +12,34 @@ import {
 
 const router = useRouter();
 const signCount = ref("--");
+const signCalendar = ref(null);
 const nicknameDialogVisible = ref(false);
 const newNickname = ref("");
 
 const userId = computed(() => sessionState.currentUser.value?.id);
 
+function normalizeSignCalendar(data) {
+  if (!data) {
+    return null;
+  }
+
+  const daysInMonth = Number(data.daysInMonth);
+  if (!Number.isInteger(daysInMonth) || daysInMonth <= 0) {
+    return null;
+  }
+
+  return {
+    year: data.year,
+    month: data.month,
+    daysInMonth,
+    signedDays: Array.isArray(data.signedDays) ? data.signedDays : [],
+  };
+}
+
 async function loadMe() {
   if (!isAuthenticated()) {
     signCount.value = "--";
+    signCalendar.value = null;
     sessionState.currentUser.value = null;
     return;
   }
@@ -36,6 +56,12 @@ async function loadMe() {
       silentError: true,
       onSuccess: (data) => {
         signCount.value = data ?? "--";
+      },
+    }),
+    userApi.fetchSignCalendar({
+      silentError: true,
+      onSuccess: (data) => {
+        signCalendar.value = normalizeSignCalendar(data);
       },
     }),
   ]);
@@ -68,7 +94,9 @@ async function submitNicknameUpdate() {
   }
 
   const trimmedNickname = newNickname.value.trim();
-  const currentNickname = (sessionState.currentUser.value?.nickName || "").trim();
+  const currentNickname = (
+    sessionState.currentUser.value?.nickName || ""
+  ).trim();
 
   if (!trimmedNickname) {
     setNotice("error", "昵称不能为空");
@@ -100,6 +128,7 @@ async function handleLogout() {
   await userApi.logout({ silentError: true });
   clearSession("已退出登录。");
   signCount.value = "--";
+  signCalendar.value = null;
   router.push("/login");
 }
 
@@ -112,11 +141,14 @@ onMounted(loadMe);
       <template #header>
         <div class="page-panel__header">
           <div>
-            <h2 class="page-panel__title">当前用户</h2>
+            <h2 class="page-panel__title">用户信息</h2>
           </div>
           <div class="page-actions">
-            <ElButton @click="loadMe">刷新</ElButton>
-            <ElButton v-if="!isAuthenticated()" type="primary" @click="jumpToLogin">
+            <ElButton
+              v-if="!isAuthenticated()"
+              type="primary"
+              @click="jumpToLogin"
+            >
               去登录
             </ElButton>
             <template v-else>
@@ -124,7 +156,9 @@ onMounted(loadMe);
               <ElButton type="info" plain @click="openNicknameEditor">
                 修改昵称
               </ElButton>
-              <ElButton type="info" plain @click="handleLogout">退出登录</ElButton>
+              <ElButton type="info" plain @click="handleLogout"
+                >退出登录</ElButton
+              >
             </template>
           </div>
         </div>
@@ -151,11 +185,40 @@ onMounted(loadMe);
       </ElDescriptions>
     </ElCard>
 
-    <ElDialog
-      v-model="nicknameDialogVisible"
-      title="修改昵称"
-      width="420px"
-    >
+    <ElCard v-if="signCalendar" class="page-panel">
+      <template #header>
+        <div class="page-panel__header">
+          <div>
+            <h3 class="page-panel__title">
+              {{ signCalendar.year }} 年 {{ signCalendar.month }} 月签到日历
+            </h3>
+          </div>
+        </div>
+      </template>
+
+      <div class="sign-calendar">
+        <div class="sign-calendar__header">
+          <span
+            v-for="day in signCalendar.daysInMonth"
+            :key="day"
+            class="sign-calendar__day"
+            :class="{ 'is-signed': signCalendar.signedDays.includes(day) }"
+          >
+            {{ day }}
+          </span>
+        </div>
+        <div class="sign-calendar__legend">
+          <span class="legend-item"
+            ><span class="legend-dot"></span> 未签到</span
+          >
+          <span class="legend-item"
+            ><span class="legend-dot is-signed"></span> 已签到</span
+          >
+        </div>
+      </div>
+    </ElCard>
+
+    <ElDialog v-model="nicknameDialogVisible" title="修改昵称" width="420px">
       <ElForm label-position="top">
         <ElFormItem label="新昵称">
           <ElInput
@@ -178,3 +241,59 @@ onMounted(loadMe);
     </ElDialog>
   </section>
 </template>
+
+<style scoped>
+.sign-calendar {
+  padding: 8px 0;
+}
+
+.sign-calendar__header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sign-calendar__day {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #f4f4f5;
+  color: #909399;
+  font-size: 14px;
+}
+
+.sign-calendar__day.is-signed {
+  background: #67c23a;
+  color: #ffffff;
+}
+
+.sign-calendar__legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #f4f4f5;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #606266;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #f4f4f5;
+}
+
+.legend-dot.is-signed {
+  background: #67c23a;
+}
+</style>

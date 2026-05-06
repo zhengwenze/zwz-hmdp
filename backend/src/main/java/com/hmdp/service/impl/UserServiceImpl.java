@@ -13,7 +13,6 @@ import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.User;
 import com.hmdp.mapper.UserMapper;
 import com.hmdp.service.IUserService;
-import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.RegexUtils;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
@@ -21,10 +20,8 @@ import org.springframework.core.env.Environment;
 import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
-
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpSession;
-
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
@@ -32,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
-
 import static com.hmdp.utils.RedisConstants.*;
 import static com.hmdp.utils.SystemConstants.*;
 
@@ -53,10 +49,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         }
         // 手机号符合,生成验证码
         String code = RandomUtil.randomNumbers(6);
-        /*
-         * //保存验证码到session
-         * session.setAttribute("code", code);
-         */
         // 保存验证码到redis
         stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY + phone, code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
         // 发送验证码
@@ -78,10 +70,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         String cacheCode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY + phone);
         String code = loginForm.getCode();
         if (cacheCode == null || !cacheCode.equals(code)) {
-            // 不一致 报错
             return Result.fail("验证码错误");
         }
-        // 一致 根据手机号查询用户
+        // 验证码一致 根据手机号查询用户
         User user = baseMapper
                 .selectOne(new LambdaQueryWrapper<User>()
                         .eq(User::getPhone, phone));
@@ -90,10 +81,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             // 不存在 创建新用户
             user = createUserWithPhone(phone);
         }
-        /*
-         * //保存用户信息到session
-         * session.setAttribute("user", BeanUtil.copyProperties(user, UserDTO.class));
-         */
         // 生成token
         String token = UUID.randomUUID().toString(true);
         // userDTO转map
@@ -170,6 +157,33 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         }
         // 返回
         return Result.ok(count);
+    }
+
+    @Override
+    public Result getSignCalendar() {
+        Long id = UserHolder.getUser().getId();
+        LocalDateTime now = LocalDateTime.now();
+        int year = now.getYear();
+        int month = now.getMonthValue();
+        int daysInMonth = now.getMonth().length(now.toLocalDate().isLeapYear());
+
+        String yyyyMM = now.format(DateTimeFormatter.ofPattern("yyyy:MM:"));
+        String key = USER_SIGN_KEY + yyyyMM + id;
+
+        List<Integer> signedDays = new java.util.ArrayList<>();
+        for (int day = 1; day <= daysInMonth; day++) {
+            Boolean signed = stringRedisTemplate.opsForValue().getBit(key, day - 1);
+            if (Boolean.TRUE.equals(signed)) {
+                signedDays.add(day);
+            }
+        }
+
+        Map<String, Object> data = new java.util.HashMap<>();
+        data.put("year", year);
+        data.put("month", month);
+        data.put("daysInMonth", daysInMonth);
+        data.put("signedDays", signedDays);
+        return Result.ok(data);
     }
 
     private User createUserWithPhone(String phone) {
