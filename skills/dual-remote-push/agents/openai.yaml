@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dual Remote Push"
+  short_description: "Commit and push the repo to Gitee master and GitHub main."
+  default_prompt: "Commit the current changes and push them to both Gitee master and GitHub main."

@@ -64,7 +64,7 @@ onMounted(syncCurrentUser);
 
 <template>
   <ElContainer class="app-layout">
-    <ElAside width="220px" class="app-sidebar">
+    <ElAside width="140px" class="app-sidebar">
       <div class="app-sidebar__brand">
         <strong>ZWZ-HMDP</strong>
       </div>
