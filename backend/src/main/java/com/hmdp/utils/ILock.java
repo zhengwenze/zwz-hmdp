@@ -2,9 +2,9 @@ package com.hmdp.utils;
 
 /**
  * redis分布式锁
- *
- * @author CHEN
- * @date 2022/10/09
+ * 
+ * @author 郑文泽
+ * @date 2026/05/06
  */
 public interface ILock {
     /**
