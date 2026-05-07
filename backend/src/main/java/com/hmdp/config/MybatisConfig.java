@@ -6,16 +6,25 @@ import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerIntercept
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-// 声明这是一个 Spring 配置类，Spring 启动时会扫描它，并加载里面定义的 Bean。
-// 创建一个 MyBatis Plus 拦截器。
-// 给这个拦截器添加分页能力，并指定数据库类型是 MySQL。
-// MyBatis Plus 在执行 SQL 时，会使用这个拦截器增强 SQL 功能。
+/**
+ * MyBatis Plus 配置类。
+ *
+ * <p>
+ * 配置分页插件，使 Page 分页查询能够按 MySQL 方言生成 LIMIT 分页 SQL。
+ * </p>
+ */
 @Configuration
 public class MybatisConfig {
+
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
-        interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));
+
+        PaginationInnerInterceptor paginationInterceptor = new PaginationInnerInterceptor(DbType.MYSQL);
+        paginationInterceptor.setMaxLimit(100L);
+        paginationInterceptor.setOverflow(false);
+
+        interceptor.addInnerInterceptor(paginationInterceptor);
         return interceptor;
     }
 }
