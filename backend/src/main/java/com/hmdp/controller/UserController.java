@@ -14,8 +14,11 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpSession;
 
+// 日志注解，记录日志
 @Slf4j
+// REST控制器注解，这是一个RESTful风格的Controller类
 @RestController
+// 请求映射注解，指定该控制器的基础路径为"/user"
 @RequestMapping("/user")
 public class UserController {
 
