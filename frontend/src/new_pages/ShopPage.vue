@@ -48,7 +48,7 @@ async function loadShopTypes() {
   }
 }
 
-async function queryShopsByType() {
+async function queryShopsByType(options = {}) {
   const { data, success } = await shopApi.fetchByType(
     {
       typeId: forms.typeId,
@@ -56,17 +56,17 @@ async function queryShopsByType() {
       x: forms.x || undefined,
       y: forms.y || undefined,
     },
-    { successMessage: "分类商铺列表已更新。" },
+    options.notify ? { successMessage: "操作成功" } : { silentError: true },
   );
   if (success) {
     shopsByType.value = Array.isArray(data) ? data : [];
   }
 }
 
-async function queryShopsByName() {
+async function queryShopsByName(options = {}) {
   const { data, success } = await shopApi.fetchByName(
     { name: forms.name, current: forms.nameCurrent },
-    { successMessage: "名称搜索结果已更新。" },
+    options.notify ? { successMessage: "操作成功" } : { silentError: true },
   );
   if (success) {
     shopsByName.value = Array.isArray(data) ? data : [];
@@ -96,7 +96,7 @@ function resetTypeFilters() {
   if (shopTypes.value.length) {
     forms.typeId = String(shopTypes.value[0].id);
   }
-  queryShopsByType();
+  queryShopsByType({ notify: true });
 }
 
 function resetNameFilters() {
@@ -107,12 +107,12 @@ function resetNameFilters() {
 
 function changeTypePage(page) {
   forms.current = String(page);
-  queryShopsByType();
+  queryShopsByType({ notify: true });
 }
 
 function changeNamePage(page) {
   forms.nameCurrent = String(page);
-  queryShopsByName();
+  queryShopsByName({ notify: true });
 }
 
 onMounted(async () => {
@@ -173,7 +173,7 @@ onMounted(async () => {
             </ElForm>
 
             <div class="filter-actions">
-              <ElButton type="primary" @click="queryShopsByType">查询</ElButton>
+              <ElButton type="primary" @click="queryShopsByType({ notify: true })">查询</ElButton>
               <ElButton @click="resetTypeFilters">重置</ElButton>
             </div>
           </ElCard>
@@ -257,7 +257,7 @@ onMounted(async () => {
                   v-model="forms.name"
                   placeholder="输入店名"
                   style="width: 240px;"
-                  @keyup.enter="queryShopsByName"
+                  @keyup.enter="queryShopsByName({ notify: true })"
                 />
               </ElFormItem>
               <ElFormItem label="页码">
@@ -266,7 +266,7 @@ onMounted(async () => {
             </ElForm>
 
             <div class="filter-actions">
-              <ElButton type="primary" @click="queryShopsByName">查询</ElButton>
+              <ElButton type="primary" @click="queryShopsByName({ notify: true })">查询</ElButton>
               <ElButton @click="resetNameFilters">重置</ElButton>
             </div>
           </ElCard>

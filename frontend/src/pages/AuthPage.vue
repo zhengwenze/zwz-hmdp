@@ -1,7 +1,14 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
-import { sharedState, send, isLoading, setNotice } from "../stores/sharedState";
+import {
+  clearNotice,
+  sharedState,
+  send,
+  isLoading,
+  setNotice,
+} from "../stores/sharedState";
+import { NOTICE_MESSAGES } from "../stores/appState";
 
 const route = useRoute();
 const router = useRouter();
@@ -32,6 +39,7 @@ const redirectTarget = computed(() => {
 });
 
 onMounted(async () => {
+  clearNotice();
   if (sharedState.token.value.trim()) {
     await fetchMe({ silent: true });
   }
@@ -42,9 +50,8 @@ async function fetchMe(options = {}) {
     "GET /user/me",
     { method: "GET", path: "/user/me" },
     {
-      successMessage: options.silent
-        ? "认证页已同步当前登录用户。"
-        : "已刷新当前登录用户。",
+      silentError: Boolean(options.silent),
+      successMessage: options.silent ? undefined : NOTICE_MESSAGES.operationSuccess,
       onSuccess: (data) => {
         sharedState.currentUser.value = data || null;
       },
@@ -66,12 +73,10 @@ async function sendCode() {
         if (typeof data === "string" && data) {
           forms.auth.code = String(data);
           lastDevCode.value = data;
-          setNotice("success", `开发环境验证码已自动回填：${data}`);
           return;
         }
 
         lastDevCode.value = "";
-        setNotice("success", "验证码请求已发送，请查看短信或后端日志。");
       },
     },
   );
@@ -89,10 +94,14 @@ async function login() {
       },
     },
     {
-      successMessage: "登录成功。若手机号首次出现，后端已自动完成注册。",
+      silentError: true,
+      onError: () => {
+        setNotice("error", NOTICE_MESSAGES.operationFailed);
+      },
       onSuccess: async (data) => {
         sharedState.token.value = data || "";
         await fetchMe({ silent: true });
+        setNotice("success", NOTICE_MESSAGES.loginSuccess);
         await router.replace(redirectTarget.value);
       },
     },
@@ -102,7 +111,7 @@ async function login() {
 function clearLocalToken() {
   sharedState.token.value = "";
   sharedState.currentUser.value = null;
-  setNotice("info", "本地 token 已清空。后端会话记录会按自身 TTL 过期。");
+  setNotice("info", NOTICE_MESSAGES.logoutSuccess);
 }
 </script>
 

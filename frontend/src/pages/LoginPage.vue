@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import { sessionState, clearSession } from "../stores/session";
-import { setNotice } from "../stores/appState";
+import { NOTICE_MESSAGES, clearNotice, setNotice } from "../stores/appState";
 import { userApi } from "../services/userApi";
 import { isLoading } from "../stores/labState";
 
@@ -34,6 +34,7 @@ const codeButtonText = computed(() =>
 );
 
 onMounted(async () => {
+  clearNotice();
   if (sessionState.token.value.trim()) {
     const { data, success } = await userApi.fetchMe({ silentError: true });
     if (success) {
@@ -69,7 +70,6 @@ async function sendCode() {
   if (typeof data === "string" && data) {
     form.code = String(data);
     lastDevCode.value = String(data);
-    setNotice("success", `开发环境验证码已自动回填：${data}`);
   } else {
     lastDevCode.value = "";
   }
@@ -89,7 +89,10 @@ async function login() {
       code: form.code,
     },
     {
-      successMessage: "登录成功。",
+      silentError: true,
+      onError: () => {
+        setNotice("error", NOTICE_MESSAGES.operationFailed);
+      },
     },
   );
 
@@ -102,6 +105,7 @@ async function login() {
   if (meResult.success) {
     sessionState.currentUser.value = meResult.data || null;
   }
+  setNotice("success", NOTICE_MESSAGES.loginSuccess);
   await router.replace(redirectTarget.value);
 }
 </script>
@@ -114,7 +118,7 @@ async function login() {
         <button
           v-if="sessionState.token.value.trim()"
           class="auth-ghost-button"
-          @click="clearSession('本地 token 已清空。')"
+          @click="clearSession('已退出')"
         >
           清空登录态
         </button>

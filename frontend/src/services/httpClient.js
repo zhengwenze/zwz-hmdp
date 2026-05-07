@@ -1,5 +1,5 @@
 import { createApiClient } from "../api";
-import { setNotice, appState } from "../stores/appState";
+import { NOTICE_MESSAGES, setNotice, appState } from "../stores/appState";
 import { clearSession, sessionState } from "../stores/session";
 import {
   markTouched,
@@ -23,20 +23,45 @@ function redirectToLogin() {
 export const apiClient = createApiClient({
   getBaseUrl: () => appState.apiBaseUrl.value.trim(),
   getToken: () => sessionState.token.value.trim(),
-  onUnauthorized: () => {
-    clearSession();
-    setNotice("error", "登录状态已失效，请重新登录。");
-    redirectToLogin();
-  },
 });
 
 export async function apiRequest(endpointKey, config, options = {}) {
   setLoading(endpointKey, true);
+  const requestToken = sessionState.token.value.trim();
   const entry = await apiClient.request(config);
   rememberResponse(entry, endpointKey);
   setLoading(endpointKey, false);
 
   const body = entry.body;
+
+  if (entry.status === 401) {
+    const currentToken = sessionState.token.value.trim();
+    if (requestToken !== currentToken) {
+      return {
+        entry,
+        body,
+        data: body?.data,
+        success: false,
+      };
+    }
+
+    clearSession();
+    if (!options.silentError) {
+      setNotice("error", NOTICE_MESSAGES.loginExpired);
+    }
+    redirectToLogin();
+    if (options.onError) {
+      await options.onError(body, entry);
+    }
+
+    return {
+      entry,
+      body,
+      data: body?.data,
+      success: false,
+    };
+  }
+
   const businessSuccess =
     entry.ok
     && (typeof body !== "object"
@@ -53,9 +78,8 @@ export async function apiRequest(endpointKey, config, options = {}) {
       await options.onSuccess(body?.data, body, entry);
     }
   } else {
-    const message = body?.errorMsg || entry.error || `HTTP ${entry.status}`;
     if (!options.silentError) {
-      setNotice("error", options.errorMessage || `${endpointKey} 调用失败：${message}`);
+      setNotice("error", options.errorMessage || NOTICE_MESSAGES.operationFailed);
     }
     if (options.onError) {
       await options.onError(body, entry);

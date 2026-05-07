@@ -15,7 +15,7 @@ const sessionLabel = computed(
 
 async function handleLogout() {
   await userApi.logout({ silentError: true });
-  clearSession("已退出登录。");
+  clearSession("已退出");
 }
 const navItems = [
   { label: "首页", to: "/" },

@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { userApi } from "../services/userApi";
+import { NOTICE_MESSAGES, clearNotice, setNotice } from "../stores/appState";
 import { sessionState } from "../stores/session";
 import { isLoading } from "../stores/labState";
 
@@ -112,10 +113,14 @@ async function login() {
 
   sessionState.token.value = data || "";
   await loadCurrentSession();
-  router.replace(redirectTarget.value);
+  setNotice("success", NOTICE_MESSAGES.loginSuccess);
+  await router.replace(redirectTarget.value);
 }
 
-onMounted(loadCurrentSession);
+onMounted(() => {
+  clearNotice();
+  loadCurrentSession();
+});
 </script>
 
 <template>

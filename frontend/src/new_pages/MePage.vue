@@ -126,7 +126,7 @@ async function submitNicknameUpdate() {
 
 async function handleLogout() {
   await userApi.logout({ silentError: true });
-  clearSession("已退出登录。");
+  clearSession("已退出");
   signCount.value = "--";
   signCalendar.value = null;
   router.push("/login");

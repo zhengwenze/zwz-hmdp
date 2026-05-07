@@ -1,6 +1,6 @@
 import { asNumber, cloneWithoutEmpty } from "../api";
 import { apiClient, apiRequest as send } from "../services/httpClient";
-import { appState, setNotice, toAssetUrl } from "./appState";
+import { appState, clearNotice, setNotice, toAssetUrl } from "./appState";
 import { sessionState } from "./session";
 import { homeFeedState } from "./homeFeed";
 import { shopFlowState } from "./shopFlow";
@@ -26,7 +26,7 @@ export const sharedState = {
   selectedShop: shopFlowState.selectedShop,
 };
 
-export { apiClient, send, setNotice, setLoading, isLoading };
+export { apiClient, send, clearNotice, setNotice, setLoading, isLoading };
 
 export function splitImages(rawValue) {
   if (!rawValue) {

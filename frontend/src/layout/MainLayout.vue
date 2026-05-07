@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { appState } from "../stores/appState";
+import { appState, clearNotice } from "../stores/appState";
 import { clearSession, isAuthenticated, sessionState } from "../stores/session";
 import { userApi } from "../services/userApi";
 
@@ -48,12 +48,8 @@ async function syncCurrentUser() {
 
 async function handleLogout() {
   await userApi.logout({ silentError: true });
-  clearSession("已退出登录。");
+  clearSession("已退出");
   router.push("/login");
-}
-
-function clearNotice() {
-  appState.notice.message = "";
 }
 
 let noticeTimer = null;
