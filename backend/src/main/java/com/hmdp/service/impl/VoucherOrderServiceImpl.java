@@ -50,7 +50,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Resource
     private StringRedisTemplate stringRedisTemplate;
     /**
-     * 自己注入自己为了获取代理对象 @Lazy 延迟注入 避免形成循环依赖
+     * @Lazy 作用：延迟 Bean 的初始化，容器启动时不创建，真正使用时才创建；
+     *       在当前类自己注入自己的场景下，加 @Lazy 可以避免循环依赖，保证项目正常启动。
      */
     @Resource
     @Lazy
