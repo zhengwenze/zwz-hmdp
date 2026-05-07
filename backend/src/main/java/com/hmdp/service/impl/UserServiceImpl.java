@@ -47,13 +47,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             // 手机号不符合
             return Result.fail("手机号格式错误");
         }
-        // 手机号符合,生成验证码
+        // 生成6位随机数字验证码
         String code = RandomUtil.randomNumbers(6);
         // 保存验证码到redis
         stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY + phone, code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
-        // 发送验证码
+        // 真正的验证码登录需要第三方提供手机验证码服务，个人做不了，这里只是模拟验证码登录
+        // 日志记录验证码
         log.debug("发送验证码成功，验证码：{}", code);
-        // 仅在开发环境回传验证码，方便前端联调自动回填
+        // 在开发环境回传验证码，方便前端联调自动回填
         return isDevProfile() ? Result.ok(code) : Result.ok();
     }
 

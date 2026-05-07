@@ -38,7 +38,7 @@ public class UserController {
     }
 
     /**
-     * 登录功能
+     * 用户登录
      * 
      * @param loginForm 登录参数，包含手机号、验证码；或者手机号、密码
      */
