@@ -8,10 +8,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * redisson配置
- *
- * @author CHEN
- * @date 2022/10/10
+ * redisson配置类，用于配置 Redis 客户端。
+ * 主要包括连接池、超时时间等。
  */
 @Configuration
 public class RedissonConfig {

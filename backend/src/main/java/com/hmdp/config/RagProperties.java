@@ -4,6 +4,8 @@ import com.hmdp.utils.SystemConstants;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+// 声明这是一个配置类，用于配置 RAG 相关的属性。
+// 这个类的属性会被 Spring Boot 自动注入到其他组件中。
 @Data
 @ConfigurationProperties(prefix = "rag")
 public class RagProperties {

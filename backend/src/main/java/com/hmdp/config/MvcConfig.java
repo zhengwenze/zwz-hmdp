@@ -13,10 +13,12 @@ import jakarta.annotation.Resource;
 import java.nio.file.Paths;
 
 /**
- * mvc配置
- *
- * @author CHEN
- * @date 2022/10/07
+ * mvc配置类，用于配置 Web 应用的 MVC 组件。
+ * 主要包括拦截器、资源处理器等。
+ * 这个类的组件会被 Spring Boot 自动扫描并加载。
+ * 1. 登陆拦截器：用于检查用户是否已登录。
+ * 2. Token续命拦截器：用于刷新用户 Token。
+ * 3. 资源处理器：用于处理静态资源的请求，如图片、CSS等。
  */
 @Configuration
 public class MvcConfig implements WebMvcConfigurer {

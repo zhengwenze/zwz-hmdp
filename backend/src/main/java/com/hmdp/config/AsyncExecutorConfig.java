@@ -8,6 +8,8 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 
+// 声明这是一个 Spring 配置类，用于配置异步任务的执行器。
+// 这个类的组件会被 Spring Boot 自动扫描并加载。
 @Slf4j
 @Configuration
 public class AsyncExecutorConfig {

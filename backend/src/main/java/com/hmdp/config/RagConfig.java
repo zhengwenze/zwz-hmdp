@@ -9,6 +9,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import java.time.Duration;
 
+// 声明这是一个 Spring 配置类，用于配置 RAG 相关的组件。
+// 这个类的组件会被 Spring Boot 自动扫描并加载。
 @Configuration
 @ConditionalOnProperty(prefix = "rag", name = "enabled", havingValue = "true")
 public class RagConfig {

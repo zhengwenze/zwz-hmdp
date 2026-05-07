@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import jakarta.validation.ConstraintViolationException;
 
+// 声明这是一个异常处理类，用于处理 Web 层的异常。
+// 这个类的异常处理方法会被 Spring Boot 自动扫描并加载。
 @Slf4j
 @RestControllerAdvice
 public class WebExceptionAdvice {
