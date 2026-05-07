@@ -2,11 +2,9 @@ package com.hmdp.utils;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.BooleanUtil;
-import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.hmdp.config.AsyncExecutorConfig.CacheRebuildTask;
-import com.hmdp.entity.Shop;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -15,15 +13,19 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import static com.hmdp.utils.RedisConstants.*;
-// CacheClient.java 是缓存访问的统一工具类
-// 封装了三种 Redis 缓存策略，解决缓存穿透、缓存击穿、缓存雪崩问题。
+
+// CacheClient.java 是缓存访问的统一工具类，封装 Redis 缓存读取、回源和重建策略。
 @Slf4j
 @Component
 public class CacheClient {
+    private static final long COLD_MISS_RETRY_INTERVAL_MILLIS = 50L;
+    private static final long LOGICAL_EXPIRE_JITTER_MINUTES_BOUND = 6L;
+
     private final StringRedisTemplate stringRedisTemplate;
     private final ThreadPoolTaskExecutor cacheRebuildExecutor;
 
@@ -56,11 +58,17 @@ public class CacheClient {
      */
     public void setWithLogicalExpire(String key, Object value, Long time, TimeUnit unit) {
         // 封装逻辑过期时间
+        long jitterMinutes = ThreadLocalRandom.current().nextLong(1, LOGICAL_EXPIRE_JITTER_MINUTES_BOUND);
+        LocalDateTime expireTime = LocalDateTime.now()
+                .plusSeconds(unit.toSeconds(time))
+                .plusMinutes(jitterMinutes);
         RedisData redisData = new RedisData();
         redisData.setData(value);
-        redisData.setExpireTime(LocalDateTime.now().plusSeconds(unit.toSeconds(time)));
+        redisData.setExpireTime(expireTime);
         // 存入redis
         stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(redisData));
+        log.debug("Set logical cache: cacheKey={}, baseTtl={} {}, jitterMinutes={}, expireTime={}",
+                key, time, unit, jitterMinutes, expireTime);
     }
 
     /**
@@ -106,51 +114,26 @@ public class CacheClient {
      * 逻辑过期解决缓存击穿
      *
      * @param id id
-     * @return {@link Shop}
+     * @return 缓存或数据库中的业务对象
      */
     public <R, ID> R queryWithLogicalExpire(String keyPrefix, ID id, Class<R> type, Function<ID, R> dbFallback,
             Long time, TimeUnit unit) {
         String key = keyPrefix + id;
-        // 从redis中查询
-        String json = stringRedisTemplate.opsForValue().get(key);
-        // 判断是否存在
-        if (json == null) {
-            // 未预热时回源数据库，并写入逻辑过期缓存
-            return loadAndSetLogicalExpire(key, id, dbFallback, time, unit);
+        CacheLookup<R> lookup = readLogicalCache(key, type, time, unit);
+        if (lookup.isMiss()) {
+            return queryColdMiss(key, id, type, dbFallback, time, unit);
         }
-        // 判断空值
-        if ("".equals(json)) {
+        if (lookup.isInvalid()) {
+            stringRedisTemplate.delete(key);
+            return queryColdMiss(key, id, type, dbFallback, time, unit);
+        }
+        if (lookup.isEmpty()) {
             return null;
         }
-
-        RedisData redisData;
-        try {
-            // 命中 反序列化
-            redisData = JSONUtil.toBean(json, RedisData.class);
-        } catch (Exception e) {
-            log.warn("Invalid logical cache data, fallback to DB: cacheKey={}", key, e);
-            stringRedisTemplate.delete(key);
-            return loadAndSetLogicalExpire(key, id, dbFallback, time, unit);
+        if (lookup.isHit()) {
+            return lookup.value;
         }
 
-        LocalDateTime expireTime = redisData.getExpireTime();
-        if (expireTime == null) {
-            // 兼容历史普通 JSON 缓存，读取成功后迁移成逻辑过期结构
-            R r = JSONUtil.toBean(json, type);
-            setWithLogicalExpire(key, r, time, unit);
-            return r;
-        }
-
-        Object data = redisData.getData();
-        if (data == null) {
-            return loadAndSetLogicalExpire(key, id, dbFallback, time, unit);
-        }
-        R r = BeanUtil.toBean((JSONObject) data, type);
-        // 判断是否过期
-        if (expireTime.isAfter(LocalDateTime.now())) {
-            // 未过期 直接返回
-            return r;
-        }
         // 已过期
         // 获取互斥锁
         String lockKey = LOCK_SHOP_KEY + id;
@@ -158,10 +141,110 @@ public class CacheClient {
         // 是否获取锁成功
         if (flag) {
             // 成功 异步重建
+            log.debug("Logical cache expired, submit async rebuild: cacheKey={}, lockKey={}", key, lockKey);
             cacheRebuildExecutor.execute(new CacheRebuildRunnable<>(key, lockKey, id, dbFallback, time, unit));
+        } else {
+            log.debug("Logical cache expired, rebuild skipped because lock is held: cacheKey={}, lockKey={}", key,
+                    lockKey);
         }
         // 返回过期商铺信息
-        return r;
+        return lookup.value;
+    }
+
+    private <R, ID> R queryColdMiss(String key, ID id, Class<R> type, Function<ID, R> dbFallback, Long time,
+            TimeUnit unit) {
+        String lockKey = LOCK_SHOP_KEY + id;
+        log.debug("Logical cache cold miss: cacheKey={}, lockKey={}", key, lockKey);
+
+        boolean locked = tryLock(lockKey);
+        if (locked) {
+            try {
+                CacheLookup<R> lookup = readLogicalCache(key, type, time, unit);
+                if (lookup.isResolved()) {
+                    log.debug("Logical cache cold miss double check resolved: cacheKey={}, status={}", key,
+                            lookup.status);
+                    return lookup.value;
+                }
+                if (lookup.isInvalid()) {
+                    stringRedisTemplate.delete(key);
+                }
+                return loadAndSetLogicalExpire(key, id, dbFallback, time, unit);
+            } finally {
+                unLock(lockKey);
+            }
+        }
+
+        log.debug("Logical cache cold miss lock failed, retry after short sleep: cacheKey={}, lockKey={}", key,
+                lockKey);
+        sleepBeforeColdMissRetry(key);
+
+        CacheLookup<R> lookup = readLogicalCache(key, type, time, unit);
+        if (lookup.isResolved()) {
+            log.debug("Logical cache cold miss retry resolved: cacheKey={}, status={}", key, lookup.status);
+            return lookup.value;
+        }
+        if (lookup.isInvalid()) {
+            stringRedisTemplate.delete(key);
+        }
+
+        log.debug("Logical cache cold miss retry still missed, fallback to DB once: cacheKey={}", key);
+        return loadAndSetLogicalExpire(key, id, dbFallback, time, unit);
+    }
+
+    private void sleepBeforeColdMissRetry(String key) {
+        try {
+            Thread.sleep(COLD_MISS_RETRY_INTERVAL_MILLIS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.debug("Logical cache cold miss retry interrupted: cacheKey={}", key);
+        }
+    }
+
+    private <R> CacheLookup<R> readLogicalCache(String key, Class<R> type, Long time, TimeUnit unit) {
+        String json = stringRedisTemplate.opsForValue().get(key);
+        return parseLogicalCache(key, json, type, time, unit);
+    }
+
+    private <R> CacheLookup<R> parseLogicalCache(String key, String json, Class<R> type, Long time, TimeUnit unit) {
+        if (json == null) {
+            return CacheLookup.miss();
+        }
+        if ("".equals(json)) {
+            return CacheLookup.empty();
+        }
+
+        RedisData redisData;
+        try {
+            redisData = JSONUtil.toBean(json, RedisData.class);
+        } catch (Exception e) {
+            log.warn("Invalid logical cache data, fallback to DB: cacheKey={}", key, e);
+            return CacheLookup.invalid();
+        }
+
+        LocalDateTime expireTime = redisData.getExpireTime();
+        if (expireTime == null) {
+            try {
+                R r = JSONUtil.toBean(json, type);
+                setWithLogicalExpire(key, r, time, unit);
+                log.debug("Migrated legacy cache to logical expire format: cacheKey={}", key);
+                return CacheLookup.hit(r);
+            } catch (Exception e) {
+                log.warn("Invalid legacy cache data, fallback to DB: cacheKey={}", key, e);
+                return CacheLookup.invalid();
+            }
+        }
+
+        Object data = redisData.getData();
+        if (data == null) {
+            log.warn("Invalid logical cache payload, fallback to DB: cacheKey={}", key);
+            return CacheLookup.invalid();
+        }
+
+        R r = BeanUtil.toBean(data, type);
+        if (expireTime.isAfter(LocalDateTime.now())) {
+            return CacheLookup.hit(r);
+        }
+        return CacheLookup.expired(r);
     }
 
     private <R, ID> R loadAndSetLogicalExpire(String key, ID id, Function<ID, R> dbFallback, Long time,
@@ -169,9 +252,11 @@ public class CacheClient {
         R r = dbFallback.apply(id);
         if (r == null) {
             stringRedisTemplate.opsForValue().set(key, "", CACHE_NULL_TTL, TimeUnit.SECONDS);
+            log.debug("Set empty cache after DB miss: cacheKey={}, ttlSeconds={}", key, CACHE_NULL_TTL);
             return null;
         }
         setWithLogicalExpire(key, r, time, unit);
+        log.debug("Loaded logical cache from DB: cacheKey={}", key);
         return r;
     }
 
@@ -229,14 +314,74 @@ public class CacheClient {
                 R newR = dbFallback.apply(id);
                 if (newR == null) {
                     stringRedisTemplate.opsForValue().set(cacheKey, "", CACHE_NULL_TTL, TimeUnit.SECONDS);
+                    log.debug("Cache rebuild completed with empty value: cacheKey={}", cacheKey);
                 } else {
                     setWithLogicalExpire(cacheKey, newR, time, unit);
+                    log.debug("Cache rebuild completed: cacheKey={}", cacheKey);
                 }
             } catch (Exception e) {
-                log.error("Cache rebuild task failed: cacheKey={}, lockKey={}", cacheKey, lockKey, e);
+                log.warn("Cache rebuild task failed: cacheKey={}, lockKey={}", cacheKey, lockKey, e);
             } finally {
                 unLock(lockKey);
             }
+        }
+    }
+
+    private enum CacheStatus {
+        MISS,
+        EMPTY,
+        HIT,
+        EXPIRED,
+        INVALID
+    }
+
+    private static final class CacheLookup<R> {
+        private final CacheStatus status;
+        private final R value;
+
+        private CacheLookup(CacheStatus status, R value) {
+            this.status = status;
+            this.value = value;
+        }
+
+        private static <R> CacheLookup<R> miss() {
+            return new CacheLookup<>(CacheStatus.MISS, null);
+        }
+
+        private static <R> CacheLookup<R> empty() {
+            return new CacheLookup<>(CacheStatus.EMPTY, null);
+        }
+
+        private static <R> CacheLookup<R> hit(R value) {
+            return new CacheLookup<>(CacheStatus.HIT, value);
+        }
+
+        private static <R> CacheLookup<R> expired(R value) {
+            return new CacheLookup<>(CacheStatus.EXPIRED, value);
+        }
+
+        private static <R> CacheLookup<R> invalid() {
+            return new CacheLookup<>(CacheStatus.INVALID, null);
+        }
+
+        private boolean isMiss() {
+            return status == CacheStatus.MISS;
+        }
+
+        private boolean isEmpty() {
+            return status == CacheStatus.EMPTY;
+        }
+
+        private boolean isHit() {
+            return status == CacheStatus.HIT;
+        }
+
+        private boolean isInvalid() {
+            return status == CacheStatus.INVALID;
+        }
+
+        private boolean isResolved() {
+            return status == CacheStatus.EMPTY || status == CacheStatus.HIT || status == CacheStatus.EXPIRED;
         }
     }
 }
