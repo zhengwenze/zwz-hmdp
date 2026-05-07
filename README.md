@@ -1,4 +1,4 @@
-# zwz-hmdp | 高并发秒杀、探店与本地知识库 RAG 平台
+# zwz-hmdp | 高并发电商秒杀系统
 
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.0-6DB33F?style=flat-square&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
 [![Vue](https://img.shields.io/badge/Vue-3.5-42B883?style=flat-square&logo=vuedotjs&logoColor=white)](https://vuejs.org/)
@@ -7,16 +7,14 @@
 [![Docker Compose](https://img.shields.io/badge/Docker%20Compose-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square)](./LICENSE)
 
-一个围绕本地生活业务场景构建的全栈项目：核心是高并发秒杀、热点缓存、社交分发和附近商铺查询，附带一套基于本地文档知识库的最小可用 RAG 客服能力。
+围绕电商业务场景构建的全栈项目：核心是高并发秒杀、热点缓存、订单处理，具备基于本地文档知识库的 RAG 客服能力。
 
-它不是“只有接口的练习仓库”，也不是“只讲思路不落代码”的笔记。这个仓库把 Lua 原子脚本、Redis Stream 异步下单、逻辑过期缓存、GEO 检索、Bitmap 签到、ZSet 点赞榜、Vue 3 管理台和 Docker Compose 运行环境放在了同一条可运行链路里。
+本项目把 Lua 原子脚本、Redis Stream 异步下单、逻辑过期缓存、GEO 检索、Bitmap 签到、ZSet 点赞榜、Vue 3 管理台和 Docker Compose 运行环境放在了同一条可运行链路里。
 
 ## 为什么值得看
 
-- **不是孤立知识点 demo**：秒杀、缓存、Feed、GEO、签到、RAG 都有对应实现和页面入口。
-- **关键链路是完整的**：从前端请求到后端落库、缓存、异步消费、容器化运行，路径是打通的。
-- **实现有工程约束**：秒杀资格判断前置到 Redis，订单异步消费走 Stream，热点缓存和穿透防护分策略处理，没有把高并发问题偷换成数据库热路径。
-- **适合学习和二次改造**：目录分层清晰，后端 `controller -> service -> mapper`，前端 `pages/services/stores` 分工明确。
+- **关键链路完整**：从前端请求到后端落库、缓存、异步消费、容器化运行，路径是打通的。
+- **实现工程约束**：秒杀资格判断前置到 Redis，订单异步消费走 Stream，热点缓存和穿透防护分策略处理，没有把高并发问题偷换成数据库热路径。
 
 ## 目录
 
@@ -30,7 +28,6 @@
 - [项目结构](#项目结构)
 - [关键实现说明](#关键实现说明)
 - [开发备注](#开发备注)
-- [License](#license)
 
 ## 技术栈
 
@@ -78,7 +75,7 @@ flowchart LR
 
 ## 快速开始
 
-### 方式一：只用 Docker Compose 一键启动（推荐）
+### 方式一：Docker Compose 一键启动（推荐）
 
 要求：
 
@@ -244,7 +241,7 @@ yarn dev
 
 ## RAG 模块说明
 
-这个仓库除了本地生活业务，还包含一个最小可用的文档知识库客服模块。
+本项目包含一个最小可用的文档知识库RAG客服模块。
 
 ### 能做什么
 
@@ -395,14 +392,63 @@ ollama pull qwen3-embedding:0.6b
 ## 开发备注
 
 - 前端路由使用 Hash 模式，和当前 Nginx 回退配置配套。
-- 秒杀关键路径依赖 `seckill.lua`、Redis Stream `stream.orders` 和 Redisson 锁，不建议绕过这些链路做“简化版”改造。
+- 秒杀关键路径依赖 `seckill.lua`、Redis Stream `stream.orders` 和 Redisson 锁。
 - 热点店铺缓存依赖 `CacheClient.queryWithLogicalExpire()`；不要把逻辑过期、空值缓存和简单删缓存混为同一种策略。
 - 如果你通过 `docker compose` 访问前端，并计划从前端页面直接使用 RAG API，请检查 [frontend/nginx.conf](./frontend/nginx.conf) 中是否包含 `/rag` 反向代理规则；当前开发环境代理已覆盖 `/rag`，容器内 Nginx 配置需要与你的实际访问路径保持一致。
 
 ## 项目工程化能力
 
-本项目使用 Docker Compose 管理开发运行环境；
-使用独立 Maven test runner 在相同 Compose 网络内执行自动化测试；
-接口烟测验证真实运行链路；
-JUnit 测试验证核心业务逻辑和回归风险；
-避免依赖本机 Maven、MySQL、Redis 环境。
+本项目使用 Docker Compose 管理开发运行环境；使用独立 Maven test runner 在相同 Compose 网络内执行自动化测试；接口烟测验证真实运行链路；JUnit 测试验证核心业务逻辑和回归风险；避免依赖本机 Maven、MySQL、Redis 环境。
+
+### 面试参考答案
+
+#### 1. 容器化与编排
+
+- 采用 **Docker Compose** 一键启动完整运行环境（MySQL、Redis、Nginx、Milvus、etcd、MinIO），无需开发机安装任何中间件
+- 前后端分离容器化部署，`Dockerfile` 多阶段构建优化镜像体积
+- `redis-init` 容器初始化 Redis Stream 消费者组，保证依赖服务就绪后再启动应用
+
+#### 2. 自动化测试
+
+- 编写了 **maven-test** Compose Service，在隔离容器网络中执行 `mvn test`，不污染宿主机
+- 提供了 `backend-smoke-test.sh` 接口烟测脚本，用 `curl` 验证核心接口（验证码、登录、公开接口、登录态接口），不依赖 `jq` 等工具
+- 有 `VoucherOrderSeckillIntegrationTest` 秒杀链路集成测试和 `VoucherOrderServiceImplTest` 单元测试
+
+#### 3. 分层设计与单一职责
+
+- 后端严格遵循 `Controller → Service → Mapper` 三层，业务逻辑不上推
+- 前端 `pages / components / services / stores` 分工明确，页面逻辑不复用逻辑
+- `CacheClient` 封装三种缓存策略（穿透/击穿/雪崩），统一入口不泄露到业务代码
+
+#### 4. Redis 高并发设计
+
+- 秒杀入口使用 **Lua 原子脚本**，库存校验 + 一人一单 + 预扣库存 + 消息投递一次完成，不回退数据库热路径
+- 订单异步链路基于 **Redis Stream + Consumer Group**，`XACK` 确认 + `Pending List` 异常恢复，消息不丢
+- 热点数据使用 **逻辑过期 + 互斥锁 + 异步重建**，保证高并发可读性与一致性
+- 附近商铺使用 **Redis GEO** 范围检索 + `order by field()` 回表，兼顾距离排序和分页
+
+#### 5. 分布式安全
+
+- 多级防超卖：Lua 脚本（第一层）→ Stream 异步（第二层）→ DB UPDATE WHERE stock>0（第三层）
+- Redisson 分布式锁按用户维度加锁兜底，防止异步消费重复创建订单
+- 唯一索引 + `DuplicateKeyException` 捕获，防止幂等破坏
+- Token 通过 `authorization` 请求头传递，不依赖 Cookie Session，支持水平扩展
+
+#### 6. 可观测性与日志
+
+- 关键路径（秒杀消费、缓存重建、登录拦截）均有结构化日志输出
+- `WebExceptionAdvice` 统一异常处理，区分业务异常和系统异常
+- 缓存穿透/击穿/雪崩各有独立日志标记（`Invalid logical cache data` / `Duplicate voucher order`）
+
+#### 7. 配置与环境隔离
+
+- `application-dev.yaml` / `application.yaml` 按 Profile 隔离开发与生产配置
+- Docker 环境变量注入敏感信息（MySQL 密码、Redis 地址、Ollama URL），不在镜像中硬编码
+- RAG 模块通过 `RAG_ENABLED=false/true` 开关，不影响主业务启动
+
+#### 8. 前端工程化
+
+- **Vite** 替代 Vue CLI，冷启动快，HMR 毫秒级响应
+- **Pinia** 状态管理，`session.js` / `appState.js` 等 store 分离关注点
+- **Element Plus** 按需引入，减少打包体积
+- **Hash Router** 配合 Nginx `try_files` 回退，前端无需配置任何代理即可部署
