@@ -20,11 +20,20 @@ import java.util.function.Function;
 import static com.hmdp.utils.RedisConstants.*;
 
 // CacheClient.java 是缓存访问的统一工具类，封装 Redis 缓存读取、回源和重建策略。
+// 封装 Redis 缓存访问逻辑，统一处理缓存读取、数据库回源、空值缓存、逻辑过期、异步重建、冷 miss 并发保护。
+// 当前 CacheClient 对缓存三大问题都有处理：
+// 通过空值缓存解决缓存穿透；通过逻辑过期、互斥锁、异步重建解决热点 key 的缓存击穿；
+// 通过逻辑过期缓存不设置物理 TTL、逻辑过期时间增加随机抖动，部分缓解缓存雪崩。
+// 但它不能完整解决 Redis 宕机、批量 key 冷 miss、大量不同 key 同时失效等雪崩场景。
+// 所以更准确的说法是：解决了穿透和击穿，缓解了雪崩。
 @Slf4j
 @Component
 public class CacheClient {
     private static final long COLD_MISS_RETRY_INTERVAL_MILLIS = 50L;
-    private static final long LOGICAL_EXPIRE_JITTER_MINUTES_BOUND = 6L;
+    private static final int COLD_MISS_RETRY_TIMES = 3;
+    private static final double LOGICAL_EXPIRE_JITTER_RATIO = 0.1D;
+    private static final long LOGICAL_EXPIRE_MIN_JITTER_SECONDS = 60L;
+    private static final long LOGICAL_EXPIRE_MAX_JITTER_SECONDS = 600L;
 
     private final StringRedisTemplate stringRedisTemplate;
     private final ThreadPoolTaskExecutor cacheRebuildExecutor;
@@ -58,17 +67,19 @@ public class CacheClient {
      */
     public void setWithLogicalExpire(String key, Object value, Long time, TimeUnit unit) {
         // 封装逻辑过期时间
-        long jitterMinutes = ThreadLocalRandom.current().nextLong(1, LOGICAL_EXPIRE_JITTER_MINUTES_BOUND);
+        long baseTtlSeconds = unit.toSeconds(time);
+        long jitterBoundSeconds = calculateJitterBoundSeconds(baseTtlSeconds);
+        long jitterSeconds = ThreadLocalRandom.current().nextLong(1, jitterBoundSeconds + 1);
         LocalDateTime expireTime = LocalDateTime.now()
-                .plusSeconds(unit.toSeconds(time))
-                .plusMinutes(jitterMinutes);
+                .plusSeconds(baseTtlSeconds)
+                .plusSeconds(jitterSeconds);
         RedisData redisData = new RedisData();
         redisData.setData(value);
         redisData.setExpireTime(expireTime);
         // 存入redis
         stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(redisData));
-        log.debug("Set logical cache: cacheKey={}, baseTtl={} {}, jitterMinutes={}, expireTime={}",
-                key, time, unit, jitterMinutes, expireTime);
+        log.debug("Set logical cache: cacheKey={}, baseTtlSeconds={}, jitterSeconds={}, expireTime={}",
+                key, baseTtlSeconds, jitterSeconds, expireTime);
     }
 
     /**
@@ -174,30 +185,47 @@ public class CacheClient {
             }
         }
 
-        log.debug("Logical cache cold miss lock failed, retry after short sleep: cacheKey={}, lockKey={}", key,
+        log.debug("Logical cache cold miss lock failed, retry with limited waits: cacheKey={}, lockKey={}", key,
                 lockKey);
-        sleepBeforeColdMissRetry(key);
 
-        CacheLookup<R> lookup = readLogicalCache(key, type, time, unit);
-        if (lookup.isResolved()) {
-            log.debug("Logical cache cold miss retry resolved: cacheKey={}, status={}", key, lookup.status);
-            return lookup.value;
-        }
-        if (lookup.isInvalid()) {
-            stringRedisTemplate.delete(key);
+        for (int retry = 1; retry <= COLD_MISS_RETRY_TIMES; retry++) {
+            if (!sleepBeforeColdMissRetry(key, retry)) {
+                break;
+            }
+
+            CacheLookup<R> lookup = readLogicalCache(key, type, time, unit);
+            if (lookup.isResolved()) {
+                log.debug("Logical cache cold miss retry resolved: cacheKey={}, retry={}, status={}", key, retry,
+                        lookup.status);
+                return lookup.value;
+            }
+            if (lookup.isInvalid()) {
+                stringRedisTemplate.delete(key);
+                log.debug("Logical cache cold miss retry found invalid cache, stop retrying: cacheKey={}, retry={}",
+                        key, retry);
+                break;
+            }
         }
 
-        log.debug("Logical cache cold miss retry still missed, fallback to DB once: cacheKey={}", key);
+        log.debug("Logical cache cold miss retry exhausted, fallback to DB once: cacheKey={}", key);
         return loadAndSetLogicalExpire(key, id, dbFallback, time, unit);
     }
 
-    private void sleepBeforeColdMissRetry(String key) {
+    private boolean sleepBeforeColdMissRetry(String key, int retry) {
         try {
             Thread.sleep(COLD_MISS_RETRY_INTERVAL_MILLIS);
+            return true;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.debug("Logical cache cold miss retry interrupted: cacheKey={}", key);
+            log.debug("Logical cache cold miss retry interrupted: cacheKey={}, retry={}", key, retry);
+            return false;
         }
+    }
+
+    private long calculateJitterBoundSeconds(long baseTtlSeconds) {
+        long ratioJitterSeconds = Math.round(baseTtlSeconds * LOGICAL_EXPIRE_JITTER_RATIO);
+        return Math.min(LOGICAL_EXPIRE_MAX_JITTER_SECONDS,
+                Math.max(LOGICAL_EXPIRE_MIN_JITTER_SECONDS, ratioJitterSeconds));
     }
 
     private <R> CacheLookup<R> readLogicalCache(String key, Class<R> type, Long time, TimeUnit unit) {
