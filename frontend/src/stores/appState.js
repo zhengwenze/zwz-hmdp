@@ -16,11 +16,13 @@ export const useAppStore = defineStore("app", () => {
   const notice = reactive({
     type: "info",
     message: "欢迎进入浮世绘版黑马点评主站。登录后可体验关注流、秒杀和发笔记。",
+    version: 0,
   });
 
   function setNotice(type, message) {
     notice.type = type;
     notice.message = message;
+    notice.version += 1;
   }
 
   watch(apiBaseUrl, (value) => localStorage.setItem("hmdp-api-base", value));
