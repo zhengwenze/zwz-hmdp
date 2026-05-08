@@ -4,10 +4,13 @@ import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hmdp.dto.MyVoucherDTO;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.SeckillVoucher;
+import com.hmdp.entity.Voucher;
 import com.hmdp.entity.VoucherOrder;
+import com.hmdp.mapper.VoucherMapper;
 import com.hmdp.mapper.VoucherOrderMapper;
 import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
@@ -41,6 +44,11 @@ import static com.hmdp.utils.RedisConstants.SECKILL_STOCK_KEY;
 @Slf4j
 public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder>
         implements IVoucherOrderService {
+    private static final int NORMAL_VOUCHER_TYPE = 0;
+    private static final int ENABLED_STATUS = 1;
+
+    @Resource
+    private VoucherMapper voucherMapper;
     @Resource
     private ISeckillVoucherService seckillVoucherService;
     @Resource
@@ -207,6 +215,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
      * @return {@link Result}
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Result seckillVoucher(Long voucherId) {
         SeckillVoucher seckillVoucher = seckillVoucherService.getById(voucherId);
         if (seckillVoucher == null) {
@@ -217,6 +226,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("秒杀尚未开始");
         }
         if (seckillVoucher.getEndTime() != null && seckillVoucher.getEndTime().isBefore(now)) {
+            purgeVoucherIds(Collections.singletonList(voucherId));
             return Result.fail("秒杀已经结束");
         }
         // 获取用户
@@ -241,6 +251,49 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail(r == 1 ? "库存不足" : "禁止重复下单");
         }
         return Result.ok(orderId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result claimVoucher(Long voucherId) {
+        Voucher voucher = voucherMapper.selectById(voucherId);
+        if (voucher == null || voucher.getStatus() == null || voucher.getStatus() != ENABLED_STATUS) {
+            return Result.fail("优惠券不存在");
+        }
+        if (voucher.getType() == null || voucher.getType() != NORMAL_VOUCHER_TYPE) {
+            return Result.fail("秒杀券请使用抢券入口");
+        }
+        UserDTO user = UserHolder.getUser();
+        if (user == null || user.getId() == null) {
+            return Result.fail("请先登录");
+        }
+
+        RLock lock = redissonClient.getLock("lock:order:" + user.getId());
+        boolean isLock = lock.tryLock();
+        if (!isLock) {
+            return Result.fail("请勿重复领取");
+        }
+        try {
+            Long count = lambdaQuery()
+                    .eq(VoucherOrder::getVoucherId, voucherId)
+                    .eq(VoucherOrder::getUserId, user.getId())
+                    .count();
+            if (count > 0) {
+                return Result.fail("禁止重复领取");
+            }
+            VoucherOrder voucherOrder = new VoucherOrder();
+            Long orderId = redisIdWorker.nextId("order");
+            voucherOrder.setId(orderId);
+            voucherOrder.setVoucherId(voucherId);
+            voucherOrder.setUserId(user.getId());
+            boolean saved = this.save(voucherOrder);
+            if (!saved) {
+                throw new IllegalStateException("Failed to save voucher order");
+            }
+            return Result.ok(orderId);
+        } finally {
+            lock.unlock();
+        }
     }
     /**
      * 秒杀优惠券(异步)
@@ -368,6 +421,18 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public Result queryMyVouchers() {
+        purgeExpiredSeckillVouchers();
+        UserDTO user = UserHolder.getUser();
+        if (user == null || user.getId() == null) {
+            return Result.fail("请先登录");
+        }
+        List<MyVoucherDTO> vouchers = getBaseMapper().queryMyVouchers(user.getId());
+        return Result.ok(vouchers);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void createVoucherOrder(VoucherOrder voucherOrder) {
         Long userId = voucherOrder.getUserId();
         Long voucherId = voucherOrder.getVoucherId();
@@ -434,6 +499,25 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                         voucher.getVoucherId(),
                         voucher.getStock());
             }
+        }
+    }
+
+    private void purgeExpiredSeckillVouchers() {
+        List<Long> expiredVoucherIds = voucherMapper.queryExpiredSeckillVoucherIds();
+        purgeVoucherIds(expiredVoucherIds);
+    }
+
+    private void purgeVoucherIds(List<Long> voucherIds) {
+        if (voucherIds == null || voucherIds.isEmpty()) {
+            return;
+        }
+        this.remove(new LambdaQueryWrapper<VoucherOrder>()
+                .in(VoucherOrder::getVoucherId, voucherIds));
+        seckillVoucherService.removeBatchByIds(voucherIds);
+        voucherMapper.deleteBatchIds(voucherIds);
+        for (Long voucherId : voucherIds) {
+            stringRedisTemplate.delete(SECKILL_STOCK_KEY + voucherId);
+            stringRedisTemplate.delete("seckill:order:" + voucherId);
         }
     }
 

@@ -22,10 +22,31 @@ export const voucherApi = {
       options,
     );
   },
+  fetchClaimable(options = {}) {
+    return apiRequest(
+      "GET /voucher/claimable",
+      { method: "GET", path: "/voucher/claimable" },
+      options,
+    );
+  },
   seckill(voucherId, options = {}) {
     return apiRequest(
       "POST /voucher-order/seckill/{id}",
       { method: "POST", path: `/voucher-order/seckill/${voucherId}` },
+      options,
+    );
+  },
+  claim(voucherId, options = {}) {
+    return apiRequest(
+      "POST /voucher-order/claim/{id}",
+      { method: "POST", path: `/voucher-order/claim/${voucherId}` },
+      options,
+    );
+  },
+  fetchMine(options = {}) {
+    return apiRequest(
+      "GET /voucher-order/of/me",
+      { method: "GET", path: "/voucher-order/of/me" },
       options,
     );
   },

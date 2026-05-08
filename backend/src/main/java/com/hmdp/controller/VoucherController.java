@@ -22,8 +22,7 @@ public class VoucherController {
      */
     @PostMapping
     public Result addVoucher(@RequestBody Voucher voucher) {
-        voucherService.save(voucher);
-        return Result.ok(voucher.getId());
+        return voucherService.addVoucher(voucher);
     }
 
     /*
@@ -49,8 +48,17 @@ public class VoucherController {
      */
     @PostMapping("seckill")
     public Result addSeckillVoucher(@RequestBody Voucher voucher) {
-        voucherService.addSeckillVoucher(voucher);
-        return Result.ok(voucher.getId());
+        return voucherService.addSeckillVoucher(voucher);
+    }
+
+    /**
+     * 查询全站当前可展示/可抢的优惠券列表
+     *
+     * @return 优惠券列表
+     */
+    @GetMapping("/claimable")
+    public Result queryClaimableVouchers() {
+        return voucherService.queryClaimableVouchers();
     }
 
     /**

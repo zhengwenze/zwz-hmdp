@@ -27,12 +27,27 @@ public interface IVoucherOrderService extends IService<VoucherOrder> {
     Result seckillVoucher(Long voucherId);
 
     /**
+     * 领取普通优惠券。
+     *
+     * @param voucherId 券id
+     * @return {@link Result}
+     */
+    Result claimVoucher(Long voucherId);
+
+    /**
      * 得到结果
      *
      * @param voucherId 券id
      * @return {@link Result}
      */
     Result getResult(Long voucherId);
+
+    /**
+     * 查询当前登录用户拥有的优惠券。
+     *
+     * @return {@link Result}
+     */
+    Result queryMyVouchers();
 
     /**
      * 创建优惠券订单

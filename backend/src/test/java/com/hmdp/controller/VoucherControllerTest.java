@@ -33,10 +33,10 @@ class VoucherControllerTest {
 
     @Test
     void addVoucher_shouldBindRequestBodyAndReturnVoucherId() throws Exception {
-        when(voucherService.save(any(Voucher.class))).thenAnswer(invocation -> {
+        when(voucherService.addVoucher(any(Voucher.class))).thenAnswer(invocation -> {
             Voucher voucher = invocation.getArgument(0);
             voucher.setId(21L);
-            return true;
+            return Result.ok(voucher.getId());
         });
 
         mockMvc.perform(post("/voucher")
@@ -47,18 +47,18 @@ class VoucherControllerTest {
                 .andExpect(jsonPath("$.data").value(21));
 
         ArgumentCaptor<Voucher> captor = ArgumentCaptor.forClass(Voucher.class);
-        verify(voucherService).save(captor.capture());
+        verify(voucherService).addVoucher(captor.capture());
         assertEquals(1L, captor.getValue().getShopId());
         assertEquals("普通券", captor.getValue().getTitle());
     }
 
     @Test
     void addSeckillVoucher_shouldBindRequestBodyAndReturnVoucherId() throws Exception {
-        org.mockito.Mockito.doAnswer(invocation -> {
+        when(voucherService.addSeckillVoucher(any(Voucher.class))).thenAnswer(invocation -> {
             Voucher voucher = invocation.getArgument(0);
             voucher.setId(22L);
-            return null;
-        }).when(voucherService).addSeckillVoucher(any(Voucher.class));
+            return Result.ok(voucher.getId());
+        });
 
         mockMvc.perform(post("/voucher/seckill")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -88,5 +88,37 @@ class VoucherControllerTest {
                 .andExpect(jsonPath("$.data[0].title").value("店铺券"));
 
         verify(voucherService).queryVoucherOfShop(1L);
+    }
+
+    @Test
+    void queryClaimableVouchers_shouldReturnClaimableVoucherList() throws Exception {
+        Voucher seckillVoucher = new Voucher();
+        seckillVoucher.setId(24L);
+        seckillVoucher.setShopId(1L);
+        seckillVoucher.setTitle("秒杀券");
+        seckillVoucher.setType(1);
+        seckillVoucher.setStock(10);
+
+        Voucher normalVoucher = new Voucher();
+        normalVoucher.setId(25L);
+        normalVoucher.setShopId(2L);
+        normalVoucher.setTitle("普通券");
+        normalVoucher.setType(0);
+
+        when(voucherService.queryClaimableVouchers())
+                .thenReturn(Result.ok(List.of(seckillVoucher, normalVoucher)));
+
+        mockMvc.perform(get("/voucher/claimable"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].id").value(24))
+                .andExpect(jsonPath("$.data[0].title").value("秒杀券"))
+                .andExpect(jsonPath("$.data[0].type").value(1))
+                .andExpect(jsonPath("$.data[0].stock").value(10))
+                .andExpect(jsonPath("$.data[1].id").value(25))
+                .andExpect(jsonPath("$.data[1].title").value("普通券"))
+                .andExpect(jsonPath("$.data[1].type").value(0));
+
+        verify(voucherService).queryClaimableVouchers();
     }
 }
