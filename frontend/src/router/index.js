@@ -5,12 +5,15 @@ import HomePage from "../new_pages/HomePage.vue";
 import LoginPage from "../new_pages/LoginPage.vue";
 import MePage from "../new_pages/MePage.vue";
 import ShopPage from "../new_pages/ShopPage.vue";
+import ShopDetailPage from "../new_pages/ShopDetailPage.vue";
 import BlogPage from "../new_pages/BlogPage.vue";
 import FollowPage from "../new_pages/FollowPage.vue";
 import VoucherPage from "../new_pages/VoucherPage.vue";
+import ClaimVoucherPage from "../new_pages/ClaimVoucherPage.vue";
 import UploadPage from "../new_pages/UploadPage.vue";
 import BlogEditorPage from "../new_pages/BlogEditorPage.vue";
 import RagPage from "../new_pages/RagPage.vue";
+import ShopCreatePage from "../new_pages/ShopCreatePage.vue";
 
 const routes = [
   {
@@ -57,12 +60,37 @@ const routes = [
       },
       {
         path: "shop",
-        name: "shop",
+        redirect: { name: "shop-list" },
+      },
+      {
+        path: "shop/list",
+        name: "shop-list",
         component: ShopPage,
         meta: {
           title: "商铺管理",
           description: "统一以筛选区、表格区和分页区承载商铺查询。",
           menu: true,
+        },
+      },
+      {
+        path: "shop/create",
+        name: "shop-create",
+        component: ShopCreatePage,
+        meta: {
+          title: "创建商铺",
+          description: "填写商铺信息并创建新商铺。",
+          menu: true,
+        },
+      },
+      {
+        path: "shop/detail/:id",
+        name: "shop-detail",
+        component: ShopDetailPage,
+        meta: {
+          title: "商铺详情",
+          description: "查看当前商铺的完整详情与优惠券。",
+          hidden: true,
+          activeMenu: "/shop/list",
         },
       },
       {
@@ -100,8 +128,18 @@ const routes = [
         name: "voucher",
         component: VoucherPage,
         meta: {
-          title: "优惠券管理",
+          title: "创建优惠券",
           description: "查询店铺券、创建普通券和秒杀券。",
+          menu: true,
+        },
+      },
+      {
+        path: "claim-vouchers",
+        name: "claim-vouchers",
+        component: ClaimVoucherPage,
+        meta: {
+          title: "抢优惠券",
+          description: "按普通券和秒杀优惠券展示当前可抢券。",
           menu: true,
         },
       },

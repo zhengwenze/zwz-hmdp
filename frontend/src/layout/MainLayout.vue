@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { Search } from "@element-plus/icons-vue";
 import { useRoute, useRouter } from "vue-router";
 import { appState, clearNotice } from "../stores/appState";
 import { clearSession, isAuthenticated, sessionState } from "../stores/session";
@@ -18,8 +19,8 @@ const menuItems = computed(() => {
     }));
 });
 
-const currentTitle = computed(() => route.meta.title || "工作台");
-const currentDescription = computed(() => route.meta.description || "");
+const activeMenuPath = computed(() => route.meta.activeMenu || route.path);
+const headerSearchKeyword = ref("");
 const noticeIcon = computed(() => {
   const icons = {
     success: "✓",
@@ -70,7 +71,11 @@ watch(
 );
 
 watch(
-  () => [appState.notice.message, appState.notice.type, appState.notice.version],
+  () => [
+    appState.notice.message,
+    appState.notice.type,
+    appState.notice.version,
+  ],
   ([message, type]) => {
     clearNoticeTimer();
 
@@ -119,7 +124,7 @@ onBeforeUnmount(clearNoticeTimer);
         <strong>ZWZ-HMDP</strong>
       </div>
       <ElScrollbar class="app-sidebar__scroll">
-        <ElMenu :default-active="route.path" router class="app-menu">
+        <ElMenu :default-active="activeMenuPath" router class="app-menu">
           <ElMenuItem
             v-for="item in menuItems"
             :key="item.path"
@@ -133,12 +138,23 @@ onBeforeUnmount(clearNoticeTimer);
 
     <ElContainer>
       <ElHeader class="app-header">
-        <div>
-          <h1 class="app-header__title">{{ currentTitle }}</h1>
-          <p v-if="currentDescription" class="app-header__description">
-            {{ currentDescription }}
-          </p>
-        </div>
+        <ElInput
+          v-model="headerSearchKeyword"
+          class="app-header__search"
+          clearable
+          placeholder="搜索店铺、笔记或优惠券"
+          aria-label="搜索"
+        >
+          <template #prefix>
+            <ElIcon class="app-header__search-icon">
+              <Search />
+            </ElIcon>
+          </template>
+        </ElInput>
+
+        <ElButton type="primary" class="app-header__search-button">
+          搜索
+        </ElButton>
 
         <div class="app-header__actions">
           <ElTag :type="isAuthenticated() ? 'primary' : 'info'" effect="plain">
@@ -238,11 +254,15 @@ onBeforeUnmount(clearNoticeTimer);
 }
 
 .top-toast-enter-active {
-  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+  transition:
+    opacity 0.3s ease-out,
+    transform 0.3s ease-out;
 }
 
 .top-toast-leave-active {
-  transition: opacity 0.25s ease-in, transform 0.25s ease-in;
+  transition:
+    opacity 0.25s ease-in,
+    transform 0.25s ease-in;
 }
 
 .top-toast-enter-from,

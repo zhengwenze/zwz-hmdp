@@ -86,7 +86,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 12px;
   height: auto;
   min-height: 72px;
   padding: 20px 28px;
@@ -94,23 +94,56 @@
   border-bottom: 1px solid var(--app-border);
 }
 
-.app-header__title {
-  margin: 0;
-  font-size: 24px;
-  line-height: 1.25;
-  color: var(--app-text);
+.app-header__search {
+  flex: 1 1 auto;
+  min-width: 240px;
 }
 
-.app-header__description {
-  margin: 6px 0 0;
+.app-header__search .el-input__wrapper {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  background: #f8fafc;
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.24) inset;
+  transition:
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.app-header__search .el-input__wrapper:hover {
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.22) inset;
+}
+
+.app-header__search .el-input__wrapper.is-focus {
+  background: #ffffff;
+  box-shadow:
+    0 0 0 1px #2563eb inset,
+    0 8px 22px rgba(37, 99, 235, 0.08);
+}
+
+.app-header__search-icon {
+  color: #64748b;
+  font-size: 16px;
+}
+
+.app-header__search .el-input__inner {
+  color: var(--app-text);
   font-size: 14px;
-  color: var(--app-text-secondary);
+}
+
+.app-header__search-button {
+  flex: 0 0 auto;
+  height: 40px;
+  padding: 0 22px;
+  border-radius: 8px;
 }
 
 .app-header__actions {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .app-header__actions .el-tag,
@@ -349,6 +382,21 @@
     padding: 18px 20px;
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .app-header__search {
+    width: 100%;
+    min-width: 0;
+    flex-basis: auto;
+  }
+
+  .app-header__search-button {
+    width: 100%;
+  }
+
+  .app-header__actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 
   .app-main {

@@ -25,6 +25,7 @@ const navItems = [
   { label: "笔记", to: "/blog" },
   { label: "关注", to: "/follow" },
   { label: "优惠", to: "/voucher" },
+  { label: "抢券", to: "/claim-vouchers" },
   { label: "上传", to: "/upload" },
 ];
 

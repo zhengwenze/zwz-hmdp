@@ -1,124 +1,146 @@
 <script setup>
-import { computed, reactive, ref } from "vue";
+import { reactive, ref } from "vue";
 import { useRouter } from "vue-router";
+import { shopApi } from "../services/shopApi";
 import { voucherApi } from "../services/voucherApi";
-import { buildRedirectPath, isAuthenticated } from "../stores/session";
-import { formatPrice, formatVoucherWindow } from "../utils/view";
+import { setNotice } from "../stores/appState";
+import { rememberShop } from "../stores/historyState";
 
 const router = useRouter();
 
 const forms = reactive({
-  shopId: "1",
-  seckillId: "1",
   normal: {
-    shopId: "1",
     title: "",
     subTitle: "",
     rules: "",
     payValue: "",
     actualValue: "",
-    type: 0,
   },
   seckill: {
-    shopId: "1",
     title: "",
     subTitle: "",
     rules: "",
     payValue: "",
     actualValue: "",
-    type: 1,
     stock: "",
     beginTime: "",
     endTime: "",
   },
 });
 
-const vouchers = ref([]);
-const latestOrderId = ref(null);
 const activeTab = ref("normal");
-const listPage = ref(1);
-const listPageSize = 10;
+const selectedShopId = ref("");
+const selectedShop = ref(null);
+const shopOptions = ref([]);
+const shopSearchLoading = ref(false);
 
-const pagedVouchers = computed(() => {
-  const start = (listPage.value - 1) * listPageSize;
-  return vouchers.value.slice(start, start + listPageSize);
-});
+async function searchShops(keyword) {
+  const name = String(keyword || "").trim();
+  if (!name) {
+    shopOptions.value = [];
+    return;
+  }
 
-function jumpToLogin() {
-  router.push(buildRedirectPath("/voucher"));
-}
+  shopSearchLoading.value = true;
+  const { data, success } = await shopApi.fetchByName(
+    { name, current: 1 },
+    { silentError: true },
+  );
+  shopSearchLoading.value = false;
 
-async function fetchVoucherList(shopId = forms.shopId) {
-  forms.shopId = String(shopId);
-  const { data, success } = await voucherApi.fetchList(shopId, {
-    successMessage: "店铺券列表已更新。",
-  });
   if (success) {
-    vouchers.value = Array.isArray(data) ? data : [];
-    listPage.value = 1;
+    shopOptions.value = Array.isArray(data) ? data : [];
   }
 }
 
+function selectShop(shopId) {
+  selectedShop.value = shopOptions.value.find(
+    (shop) => String(shop.id) === String(shopId),
+  ) || null;
+  if (selectedShop.value) {
+    rememberShop(selectedShop.value);
+  }
+}
+
+function ensureShopSelected() {
+  if (selectedShop.value?.id) {
+    return true;
+  }
+  setNotice("error", "请先选择店铺");
+  return false;
+}
+
+function goToSelectedShop() {
+  router.push({
+    name: "shop-detail",
+    params: { id: selectedShop.value.id },
+  });
+}
+
+function clearShop() {
+  selectedShop.value = null;
+}
+
 async function createNormalVoucher() {
-  await voucherApi.create(
+  if (!ensureShopSelected()) {
+    return;
+  }
+  const { success } = await voucherApi.create(
     {
-      ...forms.normal,
-      shopId: Number(forms.normal.shopId),
+      shopId: Number(selectedShop.value.id),
+      title: forms.normal.title,
+      subTitle: forms.normal.subTitle,
+      rules: forms.normal.rules,
       payValue: Number(forms.normal.payValue),
       actualValue: Number(forms.normal.actualValue),
     },
     { successMessage: "普通券创建成功。" },
   );
+  if (success) {
+    goToSelectedShop();
+  }
 }
 
 async function createSeckillVoucher() {
-  await voucherApi.createSeckill(
+  if (!ensureShopSelected()) {
+    return;
+  }
+  const { success } = await voucherApi.createSeckill(
     {
-      ...forms.seckill,
-      shopId: Number(forms.seckill.shopId),
+      shopId: Number(selectedShop.value.id),
+      title: forms.seckill.title,
+      subTitle: forms.seckill.subTitle,
+      rules: forms.seckill.rules,
       payValue: Number(forms.seckill.payValue),
       actualValue: Number(forms.seckill.actualValue),
       stock: Number(forms.seckill.stock),
+      beginTime: forms.seckill.beginTime,
+      endTime: forms.seckill.endTime,
     },
     { successMessage: "秒杀券创建成功。" },
   );
-}
-
-async function seckillVoucher(voucherId = forms.seckillId) {
-  if (!isAuthenticated()) {
-    jumpToLogin();
-    return;
-  }
-  forms.seckillId = String(voucherId);
-  const { data, success } = await voucherApi.seckill(voucherId, {
-    successMessage: "秒杀请求已发送。",
-  });
   if (success) {
-    latestOrderId.value = data ?? null;
+    goToSelectedShop();
   }
 }
 
 function resetNormalForm() {
   forms.normal = {
-    shopId: forms.shopId,
     title: "",
     subTitle: "",
     rules: "",
     payValue: "",
     actualValue: "",
-    type: 0,
   };
 }
 
 function resetSeckillForm() {
   forms.seckill = {
-    shopId: forms.shopId,
     title: "",
     subTitle: "",
     rules: "",
     payValue: "",
     actualValue: "",
-    type: 1,
     stock: "",
     beginTime: "",
     endTime: "",
@@ -132,104 +154,63 @@ function resetSeckillForm() {
       <template #header>
         <div class="page-panel__header">
           <div>
-            <h2 class="page-panel__title">优惠券管理</h2>
-            <p class="page-panel__hint">
-              列表区使用表格，创建区统一切到标签页表单。
-            </p>
+            <h3 class="page-panel__title">创建优惠券</h3>
+            <p class="page-panel__hint">先搜索并选择已有店铺，再创建普通券或秒杀券。</p>
           </div>
-          <ElTag :type="isAuthenticated() ? 'primary' : 'info'" effect="plain">
-            {{ isAuthenticated() ? "可秒杀下单" : "秒杀下单需登录" }}
-          </ElTag>
         </div>
       </template>
 
-      <ElForm inline label-position="top">
-        <ElFormItem label="店铺 ID">
-          <ElInput v-model="forms.shopId" style="width: 180px;" />
+      <ElForm label-position="top">
+        <ElFormItem label="绑定店铺">
+          <ElSelect
+            v-model="selectedShopId"
+            filterable
+            remote
+            reserve-keyword
+            clearable
+            :remote-method="searchShops"
+            :loading="shopSearchLoading"
+            placeholder="输入店铺名称搜索"
+            style="width: 100%"
+            @change="selectShop"
+            @clear="clearShop"
+          >
+            <ElOption
+              v-for="shop in shopOptions"
+              :key="shop.id"
+              :label="`${shop.name} · ID ${shop.id}`"
+              :value="shop.id"
+            >
+              <div class="voucher-shop-option">
+                <strong>{{ shop.name }}</strong>
+                <span>ID {{ shop.id }} · {{ shop.area || "未知商圈" }}</span>
+              </div>
+            </ElOption>
+          </ElSelect>
         </ElFormItem>
       </ElForm>
 
-      <div class="filter-actions">
-        <ElButton type="primary" @click="fetchVoucherList()">查询店铺券</ElButton>
-      </div>
-    </ElCard>
-
-    <ElCard class="page-panel">
-      <template #header>
-        <div class="page-panel__header">
-          <div>
-            <h3 class="page-panel__title">店铺券列表</h3>
-            <p class="page-panel__hint">使用统一表格风格展示优惠券。</p>
-          </div>
-          <ElTag effect="plain">{{ vouchers.length }} 条</ElTag>
-        </div>
-      </template>
-
-      <ElTable :data="pagedVouchers" border stripe>
-        <ElTableColumn prop="id" label="券 ID" width="96" />
-        <ElTableColumn prop="title" label="标题" min-width="160" />
-        <ElTableColumn prop="subTitle" label="副标题" min-width="180" />
-        <ElTableColumn label="类型" width="110">
-          <template #default="{ row }">
-            <ElTag :type="row.type === 1 ? 'danger' : 'info'" effect="plain">
-              {{ row.type === 1 ? "秒杀券" : "普通券" }}
-            </ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="支付 / 抵扣" min-width="180">
-          <template #default="{ row }">
-            {{ formatPrice(row.payValue) }} / {{ formatPrice(row.actualValue) }}
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="有效期" min-width="220">
-          <template #default="{ row }">
-            {{ formatVoucherWindow(row) }}
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="操作" width="180" fixed="right">
-          <template #default="{ row }">
-            <ElButton link type="primary" @click="forms.seckillId = String(row.id)">
-              设为秒杀券
-            </ElButton>
-            <ElButton link type="danger" @click="seckillVoucher(row.id)">
-              直接秒杀
-            </ElButton>
-          </template>
-        </ElTableColumn>
-        <template #empty>
-          <ElEmpty description="先查询一个店铺的券列表。" />
-        </template>
-      </ElTable>
-
-      <div class="page-table-footer">
-        <ElPagination
-          :current-page="listPage"
-          :page-size="listPageSize"
-          :total="vouchers.length"
-          layout="prev, pager, next"
-          @current-change="listPage = $event"
-        />
-      </div>
-    </ElCard>
-
-    <ElCard class="page-panel">
-      <template #header>
-        <div class="page-panel__header">
-          <div>
-            <h3 class="page-panel__title">创建与秒杀</h3>
-            <p class="page-panel__hint">普通券与秒杀券分开建表单，减少混杂字段。</p>
-          </div>
-          <ElTag effect="plain">最近订单 ID：{{ latestOrderId ?? "--" }}</ElTag>
-        </div>
-      </template>
+      <ElAlert
+        v-if="selectedShop"
+        :title="`已绑定店铺：${selectedShop.name}（ID ${selectedShop.id}）`"
+        type="success"
+        show-icon
+        :closable="false"
+        class="voucher-shop-alert"
+      />
+      <ElAlert
+        v-else
+        title="请选择店铺后再创建优惠券"
+        type="info"
+        show-icon
+        :closable="false"
+        class="voucher-shop-alert"
+      />
 
       <ElTabs v-model="activeTab">
         <ElTabPane label="普通券" name="normal">
           <ElForm label-position="top">
             <div class="page-grid-2">
-              <ElFormItem label="店铺 ID">
-                <ElInput v-model="forms.normal.shopId" />
-              </ElFormItem>
               <ElFormItem label="标题">
                 <ElInput v-model="forms.normal.title" />
               </ElFormItem>
@@ -249,7 +230,9 @@ function resetSeckillForm() {
           </ElForm>
 
           <div class="filter-actions">
-            <ElButton type="primary" @click="createNormalVoucher">创建普通券</ElButton>
+            <ElButton type="primary" @click="createNormalVoucher"
+              >创建</ElButton
+            >
             <ElButton @click="resetNormalForm">重置</ElButton>
           </div>
         </ElTabPane>
@@ -257,9 +240,6 @@ function resetSeckillForm() {
         <ElTabPane label="秒杀券" name="seckill">
           <ElForm label-position="top">
             <div class="page-grid-2">
-              <ElFormItem label="店铺 ID">
-                <ElInput v-model="forms.seckill.shopId" />
-              </ElFormItem>
               <ElFormItem label="标题">
                 <ElInput v-model="forms.seckill.title" />
               </ElFormItem>
@@ -279,20 +259,24 @@ function resetSeckillForm() {
                 <ElInput v-model="forms.seckill.stock" />
               </ElFormItem>
               <ElFormItem label="开始时间">
-                <ElInput v-model="forms.seckill.beginTime" type="datetime-local" />
+                <ElInput
+                  v-model="forms.seckill.beginTime"
+                  type="datetime-local"
+                />
               </ElFormItem>
               <ElFormItem label="结束时间">
-                <ElInput v-model="forms.seckill.endTime" type="datetime-local" />
-              </ElFormItem>
-              <ElFormItem label="秒杀券 ID">
-                <ElInput v-model="forms.seckillId" />
+                <ElInput
+                  v-model="forms.seckill.endTime"
+                  type="datetime-local"
+                />
               </ElFormItem>
             </div>
           </ElForm>
 
           <div class="filter-actions">
-            <ElButton type="primary" @click="createSeckillVoucher">创建秒杀券</ElButton>
-            <ElButton type="danger" plain @click="seckillVoucher()">发起秒杀</ElButton>
+            <ElButton type="primary" @click="createSeckillVoucher"
+              >创建</ElButton
+            >
             <ElButton @click="resetSeckillForm">重置</ElButton>
           </div>
         </ElTabPane>
@@ -300,3 +284,21 @@ function resetSeckillForm() {
     </ElCard>
   </section>
 </template>
+
+<style scoped>
+.voucher-shop-alert {
+  margin-bottom: 16px;
+}
+
+.voucher-shop-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.voucher-shop-option span {
+  color: var(--app-text-secondary);
+  font-size: 12px;
+}
+</style>

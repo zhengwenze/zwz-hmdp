@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { userApi } from "../services/userApi";
+import { voucherApi } from "../services/voucherApi";
 import { setNotice } from "../stores/appState";
 import {
   buildRedirectPath,
@@ -9,14 +10,32 @@ import {
   isAuthenticated,
   sessionState,
 } from "../stores/session";
+import { formatDateTime, formatPrice, formatVoucherWindow } from "../utils/view";
 
 const router = useRouter();
 const signCount = ref("--");
 const signCalendar = ref(null);
 const nicknameDialogVisible = ref(false);
 const newNickname = ref("");
+const myVouchers = ref([]);
+const myVouchersLoading = ref(false);
 
 const userId = computed(() => sessionState.currentUser.value?.id);
+const myVoucherCount = computed(() => myVouchers.value.length);
+
+function voucherExpireText(voucher) {
+  return voucher.endTime ? formatDateTime(voucher.endTime) : "长期有效";
+}
+
+function voucherStatusText(voucher) {
+  if (voucher.useTime) {
+    return "已核销";
+  }
+  if (voucher.endTime && new Date(voucher.endTime).getTime() < Date.now()) {
+    return "已过期";
+  }
+  return "可使用";
+}
 
 function normalizeSignCalendar(data) {
   if (!data) {
@@ -40,6 +59,7 @@ async function loadMe() {
   if (!isAuthenticated()) {
     signCount.value = "--";
     signCalendar.value = null;
+    myVouchers.value = [];
     sessionState.currentUser.value = null;
     return;
   }
@@ -64,7 +84,25 @@ async function loadMe() {
         signCalendar.value = normalizeSignCalendar(data);
       },
     }),
+    loadMyVouchers(),
   ]);
+}
+
+async function loadMyVouchers(showMessage = false) {
+  if (!isAuthenticated()) {
+    myVouchers.value = [];
+    return;
+  }
+  myVouchersLoading.value = true;
+  const { data, success } = await voucherApi.fetchMine({
+    silentError: !showMessage,
+    successMessage: showMessage ? "我的优惠券已刷新。" : "",
+  });
+  myVouchersLoading.value = false;
+
+  if (success) {
+    myVouchers.value = Array.isArray(data) ? data : [];
+  }
 }
 
 function jumpToLogin() {
@@ -129,6 +167,7 @@ async function handleLogout() {
   clearSession("已退出");
   signCount.value = "--";
   signCalendar.value = null;
+  myVouchers.value = [];
   router.push("/login");
 }
 
@@ -183,6 +222,92 @@ onMounted(loadMe);
           {{ signCount }}
         </ElDescriptionsItem>
       </ElDescriptions>
+    </ElCard>
+
+    <ElCard class="page-panel">
+      <template #header>
+        <div class="page-panel__header">
+          <div>
+            <h3 class="page-panel__title">我的优惠卷</h3>
+            <p class="page-panel__hint">
+              展示当前账号已拥有的全部优惠券和所属店铺。
+            </p>
+          </div>
+          <div class="page-actions">
+            <ElTag effect="plain">{{ myVoucherCount }} 张</ElTag>
+            <ElButton
+              v-if="isAuthenticated()"
+              type="primary"
+              plain
+              :loading="myVouchersLoading"
+              @click="loadMyVouchers(true)"
+            >
+              刷新
+            </ElButton>
+          </div>
+        </div>
+      </template>
+
+      <ElEmpty
+        v-if="!isAuthenticated()"
+        description="当前未登录，请先登录后查看我的优惠券。"
+      />
+
+      <ElTable
+        v-else
+        v-loading="myVouchersLoading"
+        :data="myVouchers"
+        border
+        stripe
+      >
+        <ElTableColumn prop="voucherId" label="券 ID" width="96" />
+        <ElTableColumn prop="title" label="优惠券" min-width="150" />
+        <ElTableColumn label="类型" width="100">
+          <template #default="{ row }">
+            <ElTag :type="row.type === 1 ? 'danger' : 'info'" effect="plain">
+              {{ row.type === 1 ? "秒杀券" : "普通券" }}
+            </ElTag>
+          </template>
+        </ElTableColumn>
+        <ElTableColumn label="所属店铺" min-width="160">
+          <template #default="{ row }">
+            {{ row.shopName || `店铺 ${row.shopId || "--"}` }}
+          </template>
+        </ElTableColumn>
+        <ElTableColumn label="支付 / 抵扣" min-width="150">
+          <template #default="{ row }">
+            {{ formatPrice(row.payValue) }} / {{ formatPrice(row.actualValue) }}
+          </template>
+        </ElTableColumn>
+        <ElTableColumn label="有效期" min-width="220">
+          <template #default="{ row }">
+            {{ formatVoucherWindow(row) }}
+          </template>
+        </ElTableColumn>
+        <ElTableColumn label="过期时间" min-width="150">
+          <template #default="{ row }">
+            {{ voucherExpireText(row) }}
+          </template>
+        </ElTableColumn>
+        <ElTableColumn label="获得时间" min-width="150">
+          <template #default="{ row }">
+            {{ formatDateTime(row.createTime) }}
+          </template>
+        </ElTableColumn>
+        <ElTableColumn label="状态" width="100">
+          <template #default="{ row }">
+            <ElTag
+              :type="voucherStatusText(row) === '可使用' ? 'success' : 'info'"
+              effect="plain"
+            >
+              {{ voucherStatusText(row) }}
+            </ElTag>
+          </template>
+        </ElTableColumn>
+        <template #empty>
+          <ElEmpty description="暂无已拥有的优惠券。" />
+        </template>
+      </ElTable>
     </ElCard>
 
     <ElCard v-if="signCalendar" class="page-panel">

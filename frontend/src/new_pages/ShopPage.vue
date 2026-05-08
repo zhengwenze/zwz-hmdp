@@ -1,16 +1,13 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { shopApi } from "../services/shopApi";
-import { voucherApi } from "../services/voucherApi";
-import {
-  firstImage,
-  formatPrice,
-  formatVoucherWindow,
-  voucherState,
-} from "../utils/view";
+import { firstImage, formatPrice } from "../utils/view";
 import { rememberShop } from "../stores/historyState";
 
 const PAGE_SIZE = 10;
+const route = useRoute();
+const router = useRouter();
 
 const forms = reactive({
   typeId: "1",
@@ -19,24 +16,56 @@ const forms = reactive({
   y: "",
   name: "",
   nameCurrent: "1",
-  detailId: "1",
 });
 
 const shopTypes = ref([]);
 const shopsByType = ref([]);
 const shopsByName = ref([]);
-const selectedShop = ref(null);
-const vouchers = ref([]);
 const activeTab = ref("type");
 
 const typePageCount = computed(
-  () => Number(forms.current) + (shopsByType.value.length === PAGE_SIZE ? 1 : 0),
+  () =>
+    Number(forms.current) + (shopsByType.value.length === PAGE_SIZE ? 1 : 0),
 );
 const namePageCount = computed(
   () =>
-    Number(forms.nameCurrent)
-    + (shopsByName.value.length === PAGE_SIZE ? 1 : 0),
+    Number(forms.nameCurrent) +
+    (shopsByName.value.length === PAGE_SIZE ? 1 : 0),
 );
+
+function asString(value, fallback = "") {
+  return typeof value === "string" ? value : fallback;
+}
+
+function applyQueryState() {
+  activeTab.value = route.query.tab === "name" ? "name" : "type";
+  forms.typeId = asString(route.query.typeId, forms.typeId);
+  forms.current = asString(route.query.current, forms.current);
+  forms.x = asString(route.query.x);
+  forms.y = asString(route.query.y);
+  forms.name = asString(route.query.name);
+  forms.nameCurrent = asString(route.query.nameCurrent, forms.nameCurrent);
+}
+
+function buildListQuery(overrides = {}) {
+  return {
+    tab: activeTab.value,
+    typeId: forms.typeId || undefined,
+    current: forms.current || "1",
+    x: forms.x || undefined,
+    y: forms.y || undefined,
+    name: forms.name || undefined,
+    nameCurrent: forms.nameCurrent || "1",
+    ...overrides,
+  };
+}
+
+function replaceListQuery(overrides = {}) {
+  return router.replace({
+    name: "shop-list",
+    query: buildListQuery(overrides),
+  });
+}
 
 async function loadShopTypes() {
   const { data, success } = await shopApi.fetchTypes({ silentError: true });
@@ -49,6 +78,10 @@ async function loadShopTypes() {
 }
 
 async function queryShopsByType(options = {}) {
+  activeTab.value = "type";
+  if (options.persist !== false) {
+    await replaceListQuery({ tab: "type" });
+  }
   const { data, success } = await shopApi.fetchByType(
     {
       typeId: forms.typeId,
@@ -64,6 +97,10 @@ async function queryShopsByType(options = {}) {
 }
 
 async function queryShopsByName(options = {}) {
+  activeTab.value = "name";
+  if (options.persist !== false) {
+    await replaceListQuery({ tab: "name" });
+  }
   const { data, success } = await shopApi.fetchByName(
     { name: forms.name, current: forms.nameCurrent },
     options.notify ? { successMessage: "操作成功" } : { silentError: true },
@@ -73,23 +110,17 @@ async function queryShopsByName(options = {}) {
   }
 }
 
-async function fetchShopDetail(shopId = forms.detailId) {
-  forms.detailId = String(shopId);
-  const [shopResult, voucherResult] = await Promise.all([
-    shopApi.fetchDetail(shopId, { silentError: true }),
-    voucherApi.fetchList(shopId, { silentError: true }),
-  ]);
-
-  if (shopResult.success) {
-    selectedShop.value = shopResult.data || null;
-    rememberShop(shopResult.data);
-  }
-  if (voucherResult.success) {
-    vouchers.value = Array.isArray(voucherResult.data) ? voucherResult.data : [];
-  }
+function openShopDetail(shop) {
+  rememberShop(shop);
+  router.push({
+    name: "shop-detail",
+    params: { id: shop.id },
+    query: buildListQuery(),
+  });
 }
 
 function resetTypeFilters() {
+  activeTab.value = "type";
   forms.current = "1";
   forms.x = "";
   forms.y = "";
@@ -100,9 +131,11 @@ function resetTypeFilters() {
 }
 
 function resetNameFilters() {
+  activeTab.value = "name";
   forms.name = "";
   forms.nameCurrent = "1";
   shopsByName.value = [];
+  replaceListQuery({ tab: "name", name: undefined, nameCurrent: "1" });
 }
 
 function changeTypePage(page) {
@@ -115,9 +148,27 @@ function changeNamePage(page) {
   queryShopsByName({ notify: true });
 }
 
+function handleTabChange(tabName) {
+  activeTab.value = tabName === "name" ? "name" : "type";
+  if (activeTab.value === "type") {
+    queryShopsByType();
+    return;
+  }
+  if (forms.name) {
+    queryShopsByName();
+    return;
+  }
+  replaceListQuery({ tab: "name" });
+}
+
 onMounted(async () => {
+  applyQueryState();
   await loadShopTypes();
-  await queryShopsByType();
+  if (activeTab.value === "name") {
+    await queryShopsByName({ persist: false });
+    return;
+  }
+  await queryShopsByType({ persist: false });
 });
 </script>
 
@@ -127,32 +178,17 @@ onMounted(async () => {
       <template #header>
         <div class="page-panel__header">
           <div>
-            <h2 class="page-panel__title">商铺列表模板页</h2>
-          </div>
-          <div class="page-actions">
-            <ElButton @click="loadShopTypes">刷新分类</ElButton>
-            <ElButton type="primary" plain @click="fetchShopDetail()">
-              查询详情
-            </ElButton>
+            <h2 class="page-panel__title">商铺管理</h2>
           </div>
         </div>
       </template>
 
-      <ElTabs v-model="activeTab">
+      <ElTabs v-model="activeTab" @tab-change="handleTabChange">
         <ElTabPane label="按分类查询" name="type">
           <ElCard shadow="never" class="page-panel">
-            <template #header>
-              <div class="page-panel__header">
-                <div>
-                  <h3 class="page-panel__title">筛选区</h3>
-                  <p class="page-panel__hint">统一使用 Element Plus 表单组织查询条件。</p>
-                </div>
-              </div>
-            </template>
-
             <ElForm inline label-position="top">
               <ElFormItem label="分类">
-                <ElSelect v-model="forms.typeId" style="width: 180px;">
+                <ElSelect v-model="forms.typeId" style="width: 180px">
                   <ElOption
                     v-for="type in shopTypes"
                     :key="type.id"
@@ -162,18 +198,30 @@ onMounted(async () => {
                 </ElSelect>
               </ElFormItem>
               <ElFormItem label="页码">
-                <ElInput v-model="forms.current" style="width: 120px;" />
+                <ElInput v-model="forms.current" style="width: 120px" />
               </ElFormItem>
               <ElFormItem label="经度 x">
-                <ElInput v-model="forms.x" placeholder="可选" style="width: 160px;" />
+                <ElInput
+                  v-model="forms.x"
+                  placeholder="可选"
+                  style="width: 160px"
+                />
               </ElFormItem>
               <ElFormItem label="纬度 y">
-                <ElInput v-model="forms.y" placeholder="可选" style="width: 160px;" />
+                <ElInput
+                  v-model="forms.y"
+                  placeholder="可选"
+                  style="width: 160px"
+                />
               </ElFormItem>
             </ElForm>
 
             <div class="filter-actions">
-              <ElButton type="primary" @click="queryShopsByType({ notify: true })">查询</ElButton>
+              <ElButton
+                type="primary"
+                @click="queryShopsByType({ notify: true })"
+                >查询</ElButton
+              >
               <ElButton @click="resetTypeFilters">重置</ElButton>
             </div>
           </ElCard>
@@ -183,7 +231,9 @@ onMounted(async () => {
               <div class="page-panel__header">
                 <div>
                   <h3 class="page-panel__title">表格区</h3>
-                  <p class="page-panel__hint">统一使用 Element Plus Table 承载列表结果。</p>
+                  <p class="page-panel__hint">
+                    统一使用 Element Plus Table 承载列表结果。
+                  </p>
                 </div>
                 <ElTag effect="plain">{{ shopsByType.length }} 条</ElTag>
               </div>
@@ -215,10 +265,14 @@ onMounted(async () => {
                   {{ ((row.score || 0) / 10).toFixed(1) }}
                 </template>
               </ElTableColumn>
-              <ElTableColumn prop="openHours" label="营业时间" min-width="180" />
+              <ElTableColumn
+                prop="openHours"
+                label="营业时间"
+                min-width="180"
+              />
               <ElTableColumn label="操作" width="120" fixed="right">
                 <template #default="{ row }">
-                  <ElButton link type="primary" @click="fetchShopDetail(row.id)">
+                  <ElButton link type="primary" @click="openShopDetail(row)">
                     查看详情
                   </ElButton>
                 </template>
@@ -242,31 +296,26 @@ onMounted(async () => {
 
         <ElTabPane label="按名称查询" name="name">
           <ElCard shadow="never" class="page-panel">
-            <template #header>
-              <div class="page-panel__header">
-                <div>
-                  <h3 class="page-panel__title">筛选区</h3>
-                  <p class="page-panel__hint">按关键词查询商铺名称。</p>
-                </div>
-              </div>
-            </template>
-
             <ElForm inline label-position="top">
               <ElFormItem label="关键词">
                 <ElInput
                   v-model="forms.name"
                   placeholder="输入店名"
-                  style="width: 240px;"
+                  style="width: 240px"
                   @keyup.enter="queryShopsByName({ notify: true })"
                 />
               </ElFormItem>
               <ElFormItem label="页码">
-                <ElInput v-model="forms.nameCurrent" style="width: 120px;" />
+                <ElInput v-model="forms.nameCurrent" style="width: 120px" />
               </ElFormItem>
             </ElForm>
 
             <div class="filter-actions">
-              <ElButton type="primary" @click="queryShopsByName({ notify: true })">查询</ElButton>
+              <ElButton
+                type="primary"
+                @click="queryShopsByName({ notify: true })"
+                >查询</ElButton
+              >
               <ElButton @click="resetNameFilters">重置</ElButton>
             </div>
           </ElCard>
@@ -301,7 +350,7 @@ onMounted(async () => {
               <ElTableColumn prop="address" label="地址" min-width="220" />
               <ElTableColumn label="操作" width="120" fixed="right">
                 <template #default="{ row }">
-                  <ElButton link type="primary" @click="fetchShopDetail(row.id)">
+                  <ElButton link type="primary" @click="openShopDetail(row)">
                     查看详情
                   </ElButton>
                 </template>
@@ -323,89 +372,6 @@ onMounted(async () => {
           </ElCard>
         </ElTabPane>
       </ElTabs>
-    </ElCard>
-
-    <ElCard class="page-panel">
-      <template #header>
-        <div class="page-panel__header">
-          <div>
-            <h3 class="page-panel__title">店铺详情与优惠券</h3>
-            <p class="page-panel__hint">
-              详情区与次级列表区统一放在页面底部，避免破坏主列表结构。
-            </p>
-          </div>
-          <div class="inline-actions">
-            <ElInput
-              v-model="forms.detailId"
-              placeholder="商铺 ID"
-              style="width: 140px;"
-            />
-            <ElButton type="primary" @click="fetchShopDetail()">查询详情</ElButton>
-          </div>
-        </div>
-      </template>
-
-      <ElEmpty v-if="!selectedShop" description="先选择或查询一个商铺。" />
-
-      <div v-else class="app-page">
-        <ElDescriptions :column="2" border>
-          <ElDescriptionsItem label="名称">
-            {{ selectedShop.name }}
-          </ElDescriptionsItem>
-          <ElDescriptionsItem label="评分">
-            {{ ((selectedShop.score || 0) / 10).toFixed(1) }}
-          </ElDescriptionsItem>
-          <ElDescriptionsItem label="均价">
-            ￥{{ formatPrice(selectedShop.avgPrice) }}/人
-          </ElDescriptionsItem>
-          <ElDescriptionsItem label="营业时间">
-            {{ selectedShop.openHours || "--" }}
-          </ElDescriptionsItem>
-          <ElDescriptionsItem label="商圈">
-            {{ selectedShop.area || "未知商圈" }}
-          </ElDescriptionsItem>
-          <ElDescriptionsItem label="地址">
-            {{ selectedShop.address || "暂无地址" }}
-          </ElDescriptionsItem>
-        </ElDescriptions>
-
-        <div v-if="firstImage(selectedShop.images)" class="detail-cover">
-          <ElImage :src="firstImage(selectedShop.images)" fit="cover" />
-        </div>
-
-        <ElTable :data="vouchers" border stripe>
-          <ElTableColumn prop="id" label="券 ID" width="100" />
-          <ElTableColumn prop="title" label="标题" min-width="160" />
-          <ElTableColumn prop="subTitle" label="副标题" min-width="180" />
-          <ElTableColumn label="类型" width="110">
-            <template #default="{ row }">
-              <ElTag :type="row.type === 1 ? 'danger' : 'info'" effect="plain">
-                {{ row.type === 1 ? "秒杀券" : "普通券" }}
-              </ElTag>
-            </template>
-          </ElTableColumn>
-          <ElTableColumn label="价格" min-width="160">
-            <template #default="{ row }">
-              支付 {{ formatPrice(row.payValue) }} / 抵扣 {{ formatPrice(row.actualValue) }}
-            </template>
-          </ElTableColumn>
-          <ElTableColumn label="时窗" min-width="220">
-            <template #default="{ row }">
-              {{ formatVoucherWindow(row) }}
-            </template>
-          </ElTableColumn>
-          <ElTableColumn label="状态" width="140">
-            <template #default="{ row }">
-              <ElTag effect="plain">
-                {{ row.type === 1 ? voucherState(row).label : "普通券" }}
-              </ElTag>
-            </template>
-          </ElTableColumn>
-          <template #empty>
-            <ElEmpty description="当前商铺暂无优惠券数据" />
-          </template>
-        </ElTable>
-      </div>
     </ElCard>
   </section>
 </template>

@@ -28,7 +28,10 @@ export const endpointCatalog = [
   { key: "POST /voucher", module: "优惠券", label: "新增普通券" },
   { key: "POST /voucher/seckill", module: "优惠券", label: "新增秒杀券" },
   { key: "GET /voucher/list/{shopId}", module: "优惠券", label: "店铺券列表" },
+  { key: "GET /voucher/claimable", module: "优惠券", label: "可抢券列表" },
   { key: "POST /voucher-order/seckill/{id}", module: "秒杀", label: "秒杀下单" },
+  { key: "POST /voucher-order/claim/{id}", module: "优惠券", label: "领取普通券" },
+  { key: "GET /voucher-order/of/me", module: "优惠券", label: "我的优惠券" },
   { key: "POST /upload/blog", module: "上传", label: "上传博客图片" },
   { key: "GET /upload/blog/delete", module: "上传", label: "删除博客图片" },
 ];

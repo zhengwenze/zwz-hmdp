@@ -12,16 +12,18 @@ import {
   renderRichText,
   splitImages,
 } from "../utils/view";
-import { historyState, rememberBlog, rememberShop } from "../stores/historyState";
+import {
+  historyState,
+  rememberBlog,
+  rememberShop,
+} from "../stores/historyState";
 
-const PAGE_SIZE = 10;
-
+const PAGE_SIZE = 5;
 const router = useRouter();
 const draft = blogFlowState.draft;
 const shopSearch = ref("");
 const shopCandidates = ref([]);
 const activeTab = ref("publish");
-
 const query = reactive({
   hotCurrent: "1",
   myCurrent: "1",
@@ -40,13 +42,15 @@ const imageInput = ref("");
 
 const uploadedImages = computed(() => blogFlowState.uploadedImages.value);
 const hotPageCount = computed(
-  () => Number(query.hotCurrent) + (hotBlogs.value.length === PAGE_SIZE ? 1 : 0),
+  () =>
+    Number(query.hotCurrent) + (hotBlogs.value.length === PAGE_SIZE ? 1 : 0),
 );
 const myPageCount = computed(
   () => Number(query.myCurrent) + (myBlogs.value.length === PAGE_SIZE ? 1 : 0),
 );
 const userPageCount = computed(
-  () => Number(query.userCurrent) + (userBlogs.value.length === PAGE_SIZE ? 1 : 0),
+  () =>
+    Number(query.userCurrent) + (userBlogs.value.length === PAGE_SIZE ? 1 : 0),
 );
 
 function jumpToLogin() {
@@ -217,7 +221,12 @@ function changeUserPage(page) {
   fetchUserBlogs();
 }
 
-onMounted(fetchHotBlogs);
+onMounted(async () => {
+  await fetchHotBlogs();
+  if (isAuthenticated()) {
+    await fetchMyBlogs();
+  }
+});
 </script>
 
 <template>
@@ -244,9 +253,13 @@ onMounted(fetchHotBlogs);
               <div class="page-panel__header">
                 <div>
                   <h3 class="page-panel__title">发布表单</h3>
-                  <p class="page-panel__hint">快速发布走当前页，复杂编辑走独立编辑页。</p>
+                  <p class="page-panel__hint">
+                    快速发布走当前页，复杂编辑走独立编辑页。
+                  </p>
                 </div>
-                <ElTag effect="plain">{{ draft.shopName || "未选择商铺" }}</ElTag>
+                <ElTag effect="plain">{{
+                  draft.shopName || "未选择商铺"
+                }}</ElTag>
               </div>
             </template>
 
@@ -270,7 +283,9 @@ onMounted(fetchHotBlogs);
                   <div class="page-panel__header">
                     <div>
                       <h4 class="page-panel__title">图片草稿</h4>
-                      <p class="page-panel__hint">支持手动路径和上传历史复用。</p>
+                      <p class="page-panel__hint">
+                        支持手动路径和上传历史复用。
+                      </p>
                     </div>
                   </div>
                 </template>
@@ -325,7 +340,7 @@ onMounted(fetchHotBlogs);
                     {{ shop.name }}
                   </ElTag>
                 </ElSpace>
-                <div class="filter-actions" style="margin-top: 16px;">
+                <div class="filter-actions" style="margin-top: 16px">
                   <ElInput
                     v-model="shopSearch"
                     placeholder="输入商铺名搜索"
@@ -333,7 +348,12 @@ onMounted(fetchHotBlogs);
                   />
                   <ElButton @click="searchShops">搜索商铺</ElButton>
                 </div>
-                <ElTable :data="shopCandidates" border stripe style="margin-top: 16px;">
+                <ElTable
+                  :data="shopCandidates"
+                  border
+                  stripe
+                  style="margin-top: 16px"
+                >
                   <ElTableColumn prop="id" label="商铺 ID" width="100" />
                   <ElTableColumn prop="name" label="商铺名" min-width="160" />
                   <ElTableColumn prop="area" label="商圈" min-width="120" />
@@ -351,7 +371,9 @@ onMounted(fetchHotBlogs);
             <div class="page-actions">
               <ElButton type="primary" @click="createBlog">发布笔记</ElButton>
               <ElButton @click="fetchMyBlogs">刷新我的笔记</ElButton>
-              <ElButton type="info" plain @click="openEditor">进入独立编辑页</ElButton>
+              <ElButton type="info" plain @click="openEditor"
+                >进入独立编辑页</ElButton
+              >
             </div>
           </ElCard>
         </ElTabPane>
@@ -362,14 +384,16 @@ onMounted(fetchHotBlogs);
               <div class="page-panel__header">
                 <div>
                   <h3 class="page-panel__title">热门列表</h3>
-                  <p class="page-panel__hint">列表结果统一用表格展示，并按后端页码拉取。</p>
+                  <p class="page-panel__hint">
+                    列表结果统一用表格展示，并按后端页码拉取。
+                  </p>
                 </div>
               </div>
             </template>
 
             <ElForm inline label-position="top">
               <ElFormItem label="页码">
-                <ElInput v-model="query.hotCurrent" style="width: 120px;" />
+                <ElInput v-model="query.hotCurrent" style="width: 120px" />
               </ElFormItem>
             </ElForm>
 
@@ -381,7 +405,11 @@ onMounted(fetchHotBlogs);
               <ElTableColumn label="封面" width="100">
                 <template #default="{ row }">
                   <div class="thumb-image">
-                    <ElImage v-if="firstImage(row.images)" :src="firstImage(row.images)" fit="cover" />
+                    <ElImage
+                      v-if="firstImage(row.images)"
+                      :src="firstImage(row.images)"
+                      fit="cover"
+                    />
                   </div>
                 </template>
               </ElTableColumn>
@@ -432,23 +460,16 @@ onMounted(fetchHotBlogs);
         <ElTabPane label="我的 / 用户笔记" name="mine">
           <div class="page-grid-2">
             <ElCard shadow="never" class="page-panel">
-              <template #header>
-                <div class="page-panel__header">
-                  <div>
-                    <h3 class="page-panel__title">我的笔记</h3>
-                    <p class="page-panel__hint">登录后按页查询个人发布记录。</p>
-                  </div>
-                </div>
-              </template>
-
               <ElForm inline label-position="top">
                 <ElFormItem label="页码">
-                  <ElInput v-model="query.myCurrent" style="width: 120px;" />
+                  <ElInput v-model="query.myCurrent" style="width: 120px" />
                 </ElFormItem>
               </ElForm>
 
               <div class="filter-actions">
-                <ElButton type="primary" @click="fetchMyBlogs">查询我的笔记</ElButton>
+                <ElButton type="primary" @click="fetchMyBlogs"
+                  >查询我的笔记</ElButton
+                >
               </div>
 
               <ElTable :data="myBlogs" border stripe>
@@ -487,22 +508,26 @@ onMounted(fetchHotBlogs);
                 <div class="page-panel__header">
                   <div>
                     <h3 class="page-panel__title">指定用户笔记</h3>
-                    <p class="page-panel__hint">按用户 ID 和页码查询公开笔记。</p>
+                    <p class="page-panel__hint">
+                      按用户 ID 和页码查询公开笔记。
+                    </p>
                   </div>
                 </div>
               </template>
 
               <ElForm inline label-position="top">
                 <ElFormItem label="用户 ID">
-                  <ElInput v-model="query.userId" style="width: 140px;" />
+                  <ElInput v-model="query.userId" style="width: 140px" />
                 </ElFormItem>
                 <ElFormItem label="页码">
-                  <ElInput v-model="query.userCurrent" style="width: 120px;" />
+                  <ElInput v-model="query.userCurrent" style="width: 120px" />
                 </ElFormItem>
               </ElForm>
 
               <div class="filter-actions">
-                <ElButton type="primary" @click="fetchUserBlogs">查询指定用户笔记</ElButton>
+                <ElButton type="primary" @click="fetchUserBlogs"
+                  >查询指定用户笔记</ElButton
+                >
               </div>
 
               <ElTable :data="userBlogs" border stripe>
@@ -544,27 +569,33 @@ onMounted(fetchHotBlogs);
               <div class="page-panel__header">
                 <div>
                   <h3 class="page-panel__title">详情查询</h3>
-                  <p class="page-panel__hint">详情内容和点赞列表拆成统一详情区。</p>
+                  <p class="page-panel__hint">
+                    详情内容和点赞列表拆成统一详情区。
+                  </p>
                 </div>
               </div>
             </template>
 
             <ElForm inline label-position="top">
               <ElFormItem label="笔记 ID">
-                <ElInput v-model="query.detailId" style="width: 140px;" />
+                <ElInput v-model="query.detailId" style="width: 140px" />
               </ElFormItem>
               <ElFormItem label="点赞列表笔记 ID">
-                <ElInput v-model="query.likesId" style="width: 180px;" />
+                <ElInput v-model="query.likesId" style="width: 180px" />
               </ElFormItem>
             </ElForm>
 
             <div class="filter-actions">
-              <ElButton type="primary" @click="fetchBlogDetail()">查询详情</ElButton>
+              <ElButton type="primary" @click="fetchBlogDetail()"
+                >查询详情</ElButton
+              >
               <ElButton @click="fetchBlogLikes()">查询点赞列表</ElButton>
-              <ElButton type="danger" plain @click="toggleLike()">切换点赞</ElButton>
+              <ElButton type="danger" plain @click="toggleLike()"
+                >切换点赞</ElButton
+              >
             </div>
 
-            <div v-if="detailBlog" class="app-page" style="margin-top: 20px;">
+            <div v-if="detailBlog" class="app-page" style="margin-top: 20px">
               <ElDescriptions :column="2" border>
                 <ElDescriptionsItem label="标题">
                   {{ detailBlog.title }}
@@ -593,7 +624,10 @@ onMounted(fetchHotBlogs);
                 </div>
               </div>
 
-              <div class="rich-copy" v-html="renderRichText(detailBlog.content)" />
+              <div
+                class="rich-copy"
+                v-html="renderRichText(detailBlog.content)"
+              />
             </div>
             <ElEmpty v-else description="先查询一篇笔记详情。" />
 

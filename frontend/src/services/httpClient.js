@@ -79,7 +79,10 @@ export async function apiRequest(endpointKey, config, options = {}) {
     }
   } else {
     if (!options.silentError) {
-      setNotice("error", options.errorMessage || NOTICE_MESSAGES.operationFailed);
+      setNotice(
+        "error",
+        options.errorMessage || body?.errorMsg || NOTICE_MESSAGES.operationFailed,
+      );
     }
     if (options.onError) {
       await options.onError(body, entry);

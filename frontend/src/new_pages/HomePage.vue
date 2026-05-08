@@ -11,8 +11,8 @@ const moduleCards = [
   },
   {
     title: "商铺管理",
-    path: "/shop",
-    description: "使用统一筛选区、表格区和分页区查询商铺与详情。",
+    path: "/shop/list",
+    description: "使用统一筛选区、表格区和分页区查询商铺列表。",
   },
   {
     title: "笔记管理",
