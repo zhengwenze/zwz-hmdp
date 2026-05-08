@@ -15,20 +15,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.util.ReflectionTestUtils;
-
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@SpringBootTest(
-        classes = HmDianPingApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.NONE,
-        properties = "rag.enabled=false")
+@SpringBootTest(classes = HmDianPingApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = "rag.enabled=false")
 class VoucherOrderSeckillIntegrationTest {
 
     private static final String STREAM_KEY = "stream.orders";
@@ -63,7 +58,8 @@ class VoucherOrderSeckillIntegrationTest {
 
     @Test
     void seckillVoucherShouldCreateOrderAndDeductStock() throws Exception {
-        Long voucherId = createSeckillVoucher(3, LocalDateTime.now().minusMinutes(5), LocalDateTime.now().plusMinutes(30));
+        Long voucherId = createSeckillVoucher(3, LocalDateTime.now().minusMinutes(5),
+                LocalDateTime.now().plusMinutes(30));
         saveUser(910001L);
 
         Result result = voucherOrderService.seckillVoucher(voucherId);
@@ -79,7 +75,8 @@ class VoucherOrderSeckillIntegrationTest {
 
     @Test
     void seckillVoucherShouldRejectDuplicateOrder() throws Exception {
-        Long voucherId = createSeckillVoucher(3, LocalDateTime.now().minusMinutes(5), LocalDateTime.now().plusMinutes(30));
+        Long voucherId = createSeckillVoucher(3, LocalDateTime.now().minusMinutes(5),
+                LocalDateTime.now().plusMinutes(30));
         saveUser(910002L);
 
         Result first = voucherOrderService.seckillVoucher(voucherId);
@@ -98,7 +95,8 @@ class VoucherOrderSeckillIntegrationTest {
 
     @Test
     void seckillVoucherShouldRejectWhenStockIsEmpty() {
-        Long voucherId = createSeckillVoucher(0, LocalDateTime.now().minusMinutes(5), LocalDateTime.now().plusMinutes(30));
+        Long voucherId = createSeckillVoucher(0, LocalDateTime.now().minusMinutes(5),
+                LocalDateTime.now().plusMinutes(30));
         saveUser(910003L);
 
         Result result = voucherOrderService.seckillVoucher(voucherId);
@@ -113,7 +111,8 @@ class VoucherOrderSeckillIntegrationTest {
 
     @Test
     void seckillVoucherShouldRejectBeforeBeginTimeWithoutWritingStream() {
-        Long voucherId = createSeckillVoucher(3, LocalDateTime.now().plusMinutes(10), LocalDateTime.now().plusMinutes(30));
+        Long voucherId = createSeckillVoucher(3, LocalDateTime.now().plusMinutes(10),
+                LocalDateTime.now().plusMinutes(30));
         saveUser(910004L);
         Long streamSizeBefore = stringRedisTemplate.opsForStream().size(STREAM_KEY);
 
@@ -129,7 +128,8 @@ class VoucherOrderSeckillIntegrationTest {
 
     @Test
     void seckillVoucherShouldRejectAfterEndTimeWithoutWritingStream() {
-        Long voucherId = createSeckillVoucher(3, LocalDateTime.now().minusMinutes(30), LocalDateTime.now().minusMinutes(1));
+        Long voucherId = createSeckillVoucher(3, LocalDateTime.now().minusMinutes(30),
+                LocalDateTime.now().minusMinutes(1));
         saveUser(910005L);
         Long streamSizeBefore = stringRedisTemplate.opsForStream().size(STREAM_KEY);
 
@@ -145,7 +145,8 @@ class VoucherOrderSeckillIntegrationTest {
 
     @Test
     void shouldRecreateMissingStockCacheThroughPreloadHook() {
-        Long voucherId = createSeckillVoucher(5, LocalDateTime.now().minusMinutes(5), LocalDateTime.now().plusMinutes(30));
+        Long voucherId = createSeckillVoucher(5, LocalDateTime.now().minusMinutes(5),
+                LocalDateTime.now().plusMinutes(30));
         stringRedisTemplate.delete(RedisConstants.SECKILL_STOCK_KEY + voucherId);
 
         ReflectionTestUtils.invokeMethod(voucherOrderService, "preloadSeckillStockCache");
@@ -162,7 +163,8 @@ class VoucherOrderSeckillIntegrationTest {
 
     @Test
     void createVoucherOrderShouldBeSafeForRepeatedConsumption() {
-        Long voucherId = createSeckillVoucher(3, LocalDateTime.now().minusMinutes(5), LocalDateTime.now().plusMinutes(30));
+        Long voucherId = createSeckillVoucher(3, LocalDateTime.now().minusMinutes(5),
+                LocalDateTime.now().plusMinutes(30));
 
         VoucherOrder first = new VoucherOrder();
         first.setId(Math.abs(System.nanoTime()));

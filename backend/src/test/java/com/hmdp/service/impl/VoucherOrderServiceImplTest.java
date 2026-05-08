@@ -11,17 +11,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@SpringBootTest(
-        classes = HmDianPingApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.NONE,
-        properties = "rag.enabled=false")
+@SpringBootTest(classes = HmDianPingApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = "rag.enabled=false")
 class VoucherOrderServiceImplTest {
 
     @Autowired
@@ -51,7 +46,8 @@ class VoucherOrderServiceImplTest {
 
     @Test
     void createVoucherOrderShouldPersistOrderAndDeductStock() {
-        Long voucherId = createSeckillVoucher(3, LocalDateTime.now().minusMinutes(5), LocalDateTime.now().plusMinutes(30));
+        Long voucherId = createSeckillVoucher(3, LocalDateTime.now().minusMinutes(5),
+                LocalDateTime.now().plusMinutes(30));
 
         VoucherOrder order = new VoucherOrder();
         order.setId(redisIdWorker.nextId("test-order"));
@@ -71,7 +67,8 @@ class VoucherOrderServiceImplTest {
 
     @Test
     void createVoucherOrderShouldBeIdempotentForDuplicateMessage() {
-        Long voucherId = createSeckillVoucher(3, LocalDateTime.now().minusMinutes(5), LocalDateTime.now().plusMinutes(30));
+        Long voucherId = createSeckillVoucher(3, LocalDateTime.now().minusMinutes(5),
+                LocalDateTime.now().plusMinutes(30));
 
         VoucherOrder firstOrder = new VoucherOrder();
         firstOrder.setId(redisIdWorker.nextId("test-order"));
@@ -96,7 +93,8 @@ class VoucherOrderServiceImplTest {
 
     @Test
     void createVoucherOrderShouldNotPersistOrderWhenStockIsInsufficient() {
-        Long voucherId = createSeckillVoucher(0, LocalDateTime.now().minusMinutes(5), LocalDateTime.now().plusMinutes(30));
+        Long voucherId = createSeckillVoucher(0, LocalDateTime.now().minusMinutes(5),
+                LocalDateTime.now().plusMinutes(30));
 
         VoucherOrder order = new VoucherOrder();
         order.setId(redisIdWorker.nextId("test-order"));
