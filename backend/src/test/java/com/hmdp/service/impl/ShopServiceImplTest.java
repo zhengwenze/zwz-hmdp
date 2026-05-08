@@ -3,13 +3,17 @@ package com.hmdp.service.impl;
 import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
+import com.hmdp.dto.ShopCreateRequest;
 import com.hmdp.entity.Shop;
+import com.hmdp.entity.ShopType;
 import com.hmdp.mapper.ShopMapper;
+import com.hmdp.mapper.ShopTypeMapper;
 import com.hmdp.utils.CacheClient;
 import com.hmdp.utils.RedisConstants;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.ArgumentMatchers;
@@ -50,6 +54,9 @@ class ShopServiceImplTest {
     private ShopMapper shopMapper;
 
     @Mock
+    private ShopTypeMapper shopTypeMapper;
+
+    @Mock
     private StringRedisTemplate stringRedisTemplate;
 
     @Mock
@@ -64,6 +71,7 @@ class ShopServiceImplTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(shopService, "baseMapper", shopMapper);
+        ReflectionTestUtils.setField(shopService, "shopTypeMapper", shopTypeMapper);
         ReflectionTestUtils.setField(shopService, "stringRedisTemplate", stringRedisTemplate);
         ReflectionTestUtils.setField(shopService, "cacheClient", cacheClient);
         lenient().doReturn(queryChainWrapper).when(shopService).lambdaQuery();
@@ -90,6 +98,49 @@ class ShopServiceImplTest {
 
         assertFalse(result.getSuccess());
         assertEquals("店铺不存在", result.getErrorMsg());
+    }
+
+    @Test
+    void create_shouldSaveShopWithDefaultsAndAddGeoIndex() {
+        ShopCreateRequest request = new ShopCreateRequest();
+        request.setName(" 新增商铺 ");
+        request.setTypeId(1L);
+        request.setImages("cdn.example.com/shop.jpg");
+        request.setArea("西湖");
+        request.setAddress("文三路1号");
+        request.setX(120.1);
+        request.setY(30.2);
+
+        Shop savedShop = new Shop()
+                .setId(15L)
+                .setName("新增商铺")
+                .setTypeId(1L)
+                .setImages("https://cdn.example.com/shop.jpg")
+                .setArea("西湖")
+                .setAddress("文三路1号")
+                .setX(120.1)
+                .setY(30.2)
+                .setSold(0)
+                .setComments(0)
+                .setScore(50);
+
+        when(shopTypeMapper.selectById(1L)).thenReturn(new ShopType().setId(1L));
+        when(stringRedisTemplate.opsForGeo()).thenReturn(geoOperations);
+        doReturn(savedShop).when(shopService).getById(15L);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            Shop shop = invocation.getArgument(0);
+            shop.setId(15L);
+            return true;
+        }).when(shopService).save(any(Shop.class));
+
+        Result result = shopService.create(request);
+
+        assertTrue(result.getSuccess());
+        assertEquals(savedShop, result.getData());
+        ArgumentCaptor<Shop> shopCaptor = ArgumentCaptor.forClass(Shop.class);
+        verify(shopService).save(shopCaptor.capture());
+        assertEquals("https://cdn.example.com/shop.jpg", shopCaptor.getValue().getImages());
+        verify(geoOperations).add(eq(SHOP_GEO_KEY + 1L), any(Point.class), eq("15"));
     }
 
     @Test

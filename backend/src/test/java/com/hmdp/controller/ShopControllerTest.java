@@ -3,6 +3,7 @@ package com.hmdp.controller;
 import com.baomidou.mybatisplus.extension.conditions.query.QueryChainWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
+import com.hmdp.dto.ShopCreateRequest;
 import com.hmdp.entity.Shop;
 import com.hmdp.service.IShopService;
 import org.junit.jupiter.api.Test;
@@ -54,13 +55,23 @@ class ShopControllerTest {
 
     @Test
     void saveShop_shouldBindRequestBodyAndReturnOk() throws Exception {
-        mockMvc.perform(post("/shop")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"新增商铺\",\"typeId\":2,\"address\":\"测试地址\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
+        Shop shop = new Shop();
+        shop.setId(15L);
+        shop.setName("新增商铺");
+        when(shopService.create(any(ShopCreateRequest.class))).thenReturn(Result.ok(shop));
 
-        verify(shopService).save(any(Shop.class));
+        String payload = "{\"name\":\"新增商铺\",\"typeId\":2,\"images\":\"https://cdn.example.com/shop.jpg\",\"address\":\"测试地址\",\"x\":120.1,\"y\":30.2}";
+
+        mockMvc.perform(
+                post("/shop")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").value(15))
+                .andExpect(jsonPath("$.data.name").value("新增商铺"));
+
+        verify(shopService).create(any(ShopCreateRequest.class));
     }
 
     @Test

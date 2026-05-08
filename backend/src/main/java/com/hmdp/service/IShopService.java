@@ -2,6 +2,7 @@ package com.hmdp.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.hmdp.dto.Result;
+import com.hmdp.dto.ShopCreateRequest;
 import com.hmdp.entity.Shop;
 
 /**
@@ -21,6 +22,14 @@ public interface IShopService extends IService<Shop> {
      * @return {@link Result}
      */
     Result queryById(Long id);
+
+    /**
+     * 创建店铺
+     *
+     * @param request 店铺创建请求
+     * @return {@link Result}
+     */
+    Result create(ShopCreateRequest request);
 
     /**
      * 更新店铺信息

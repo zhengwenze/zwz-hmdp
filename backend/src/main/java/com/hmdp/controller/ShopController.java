@@ -3,11 +3,13 @@ package com.hmdp.controller;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
+import com.hmdp.dto.ShopCreateRequest;
 import com.hmdp.entity.Shop;
 import com.hmdp.service.IShopService;
 import com.hmdp.utils.SystemConstants;
 import org.springframework.web.bind.annotation.*;
 import jakarta.annotation.Resource;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/shop")
@@ -34,10 +36,8 @@ public class ShopController {
      * @return 商铺id
      */
     @PostMapping
-    public Result saveShop(@RequestBody Shop shop) {
-        // 写入数据库
-        shopService.save(shop);
-        return Result.ok();
+    public Result saveShop(@Valid @RequestBody ShopCreateRequest shop) {
+        return shopService.create(shop);
     }
 
     /**

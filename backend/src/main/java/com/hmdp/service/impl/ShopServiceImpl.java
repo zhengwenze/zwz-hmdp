@@ -4,11 +4,14 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.Result;
+import com.hmdp.dto.ShopCreateRequest;
 import com.hmdp.entity.Shop;
 import com.hmdp.mapper.ShopMapper;
+import com.hmdp.mapper.ShopTypeMapper;
 import com.hmdp.service.IShopService;
 import com.hmdp.utils.CacheClient;
 import com.hmdp.utils.SystemConstants;
+import org.springframework.data.geo.Point;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResult;
 import org.springframework.data.geo.GeoResults;
@@ -30,6 +33,8 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     private StringRedisTemplate stringRedisTemplate;
     @Resource
     private CacheClient cacheClient;
+    @Resource
+    private ShopTypeMapper shopTypeMapper;
 
     // 1，根据id查询商户信息
     @Override
@@ -41,6 +46,61 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             return Result.fail("店铺不存在");
         }
         return Result.ok(shop);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result create(ShopCreateRequest request) {
+        String name = normalize(request.getName());
+        String images = normalizeImageList(request.getImages());
+        String area = normalize(request.getArea());
+        String address = normalize(request.getAddress());
+        String openHours = normalize(request.getOpenHours());
+
+        if (StrUtil.isBlank(name)) {
+            return Result.fail("商铺名称不能为空");
+        }
+        if (request.getTypeId() == null) {
+            return Result.fail("商铺分类不能为空");
+        }
+        if (StrUtil.isBlank(images)) {
+            return Result.fail("商铺图片必须是 http 或 https 网络链接，多个链接用英文逗号分隔");
+        }
+        if (StrUtil.isBlank(address)) {
+            return Result.fail("商铺地址不能为空");
+        }
+        if (request.getX() == null || request.getY() == null) {
+            return Result.fail("经纬度不能为空");
+        }
+        if (shopTypeMapper.selectById(request.getTypeId()) == null) {
+            return Result.fail("商铺分类不存在");
+        }
+
+        Shop shop = new Shop()
+                .setName(name)
+                .setTypeId(request.getTypeId())
+                .setImages(images)
+                .setArea(area)
+                .setAddress(address)
+                .setX(request.getX())
+                .setY(request.getY())
+                .setAvgPrice(request.getAvgPrice())
+                .setSold(0)
+                .setComments(0)
+                .setScore(request.getScore() == null ? 50 : request.getScore())
+                .setOpenHours(openHours);
+
+        boolean saved = save(shop);
+        if (!saved) {
+            return Result.fail("创建商铺失败");
+        }
+
+        stringRedisTemplate.opsForGeo().add(
+                SHOP_GEO_KEY + shop.getTypeId(),
+                new Point(shop.getX(), shop.getY()),
+                shop.getId().toString());
+
+        return Result.ok(getById(shop.getId()));
     }
 
     // 2，更新店铺信息
@@ -104,5 +164,32 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             shop.setDistance(distanceMap.get(shop.getId().toString()).getValue());
         }
         return Result.ok(shopList);
+    }
+
+    private String normalize(String value) {
+        return StrUtil.isBlank(value) ? null : value.trim();
+    }
+
+    private String normalizeImageList(String images) {
+        if (StrUtil.isBlank(images)) {
+            return null;
+        }
+        List<String> urls = new ArrayList<>();
+        for (String image : images.split(",")) {
+            String url = normalize(image);
+            if (StrUtil.isBlank(url)) {
+                return null;
+            }
+            if (url.startsWith("//")) {
+                url = "https:" + url;
+            } else if (!(url.startsWith("http://") || url.startsWith("https://"))) {
+                if (url.startsWith("/") || !url.contains(".")) {
+                    return null;
+                }
+                url = "https://" + url;
+            }
+            urls.add(url);
+        }
+        return StrUtil.join(",", urls);
     }
 }
