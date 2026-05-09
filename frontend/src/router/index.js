@@ -14,6 +14,7 @@ import UploadPage from "../new_pages/UploadPage.vue";
 import BlogEditorPage from "../new_pages/BlogEditorPage.vue";
 import RagPage from "../new_pages/RagPage.vue";
 import ShopCreatePage from "../new_pages/ShopCreatePage.vue";
+import NearbyShopsPage from "../new_pages/NearbyShopsPage.vue";
 
 const routes = [
   {
@@ -160,6 +161,16 @@ const routes = [
         meta: {
           title: "智能客服",
           description: "基于本地文档知识库的最小可用 RAG 客服与索引状态页。",
+          menu: true,
+        },
+      },
+      {
+        path: "nearby-shops",
+        name: "nearby-shops",
+        component: NearbyShopsPage,
+        meta: {
+          title: "附近商铺",
+          description: "基于地理位置查询附近的商铺，支持按距离排序和筛选。",
           menu: true,
         },
       },
