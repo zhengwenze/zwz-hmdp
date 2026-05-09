@@ -1,7 +1,7 @@
 package com.hmdp.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.hmdp.HmDianPingApplication;
+import com.hmdp.HMDPApplication;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Voucher;
@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@SpringBootTest(classes = HmDianPingApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = "rag.enabled=false")
+@SpringBootTest(classes = HMDPApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = "rag.enabled=false")
 class VoucherOrderSeckillIntegrationTest {
 
     private static final String STREAM_KEY = "stream.orders";

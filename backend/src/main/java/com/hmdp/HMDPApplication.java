@@ -7,17 +7,14 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 /**
  * 启动类
- *
- * @author CHEN
- * @date 2022/10/07
  */
 @MapperScan("com.hmdp.mapper")
 @SpringBootApplication
 @ConfigurationPropertiesScan
-public class HmDianPingApplication {
+public class HMDPApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(HmDianPingApplication.class, args);
+        SpringApplication.run(HMDPApplication.class, args);
     }
 
 }

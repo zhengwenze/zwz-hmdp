@@ -2,7 +2,6 @@ package com.hmdp.utils;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
-
 import jakarta.annotation.Resource;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -10,9 +9,6 @@ import java.time.format.DateTimeFormatter;
 
 /**
  * redis ID生成器
- *
- * @author CHEN
- * @date 2022/10/09
  */
 @Component
 public class RedisIdWorker {
@@ -35,17 +31,17 @@ public class RedisIdWorker {
      * @return {@link Long}
      */
     public Long nextId(String keyPrefix) {
-        //生成时间戳
+        // 生成时间戳
         LocalDateTime now = LocalDateTime.now();
         long nowSecond = now.toEpochSecond(ZoneOffset.UTC);
         long timestamp = nowSecond - BEGIN_TIMESTAMP;
-        //生成序列号
-        //生成当前日期 精确到天
+        // 生成序列号
+        // 生成当前日期 精确到天
         String today = now.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        //自增长
+        // 自增长
         Long count = stringRedisTemplate.opsForValue().increment("icr:" + keyPrefix + ":" + today);
-        //拼接并返回
-        return timestamp << COUNT_BITS|count ;
+        // 拼接并返回
+        return timestamp << COUNT_BITS | count;
     }
 
 }

@@ -1,7 +1,7 @@
 package com.hmdp.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.hmdp.HmDianPingApplication;
+import com.hmdp.HMDPApplication;
 import com.hmdp.entity.Voucher;
 import com.hmdp.entity.VoucherOrder;
 import com.hmdp.service.ISeckillVoucherService;
@@ -16,7 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@SpringBootTest(classes = HmDianPingApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = "rag.enabled=false")
+@SpringBootTest(classes = HMDPApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = "rag.enabled=false")
 class VoucherOrderServiceImplTest {
 
     @Autowired
