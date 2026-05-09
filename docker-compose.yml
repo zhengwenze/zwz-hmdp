@@ -58,10 +58,7 @@ services:
       ETCD_QUOTA_BACKEND_BYTES: "4294967296"
       ETCD_SNAPSHOT_COUNT: "50000"
     command: >
-      etcd
-      -advertise-client-urls=http://etcd:2379
-      -listen-client-urls=http://0.0.0.0:2379
-      --data-dir=/etcd
+      etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls=http://0.0.0.0:2379 --data-dir=/etcd
     volumes:
       - etcd-data:/etcd
 
