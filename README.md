@@ -1,4 +1,4 @@
-# zwz-hmdp | 高并发电商秒杀系统
+# zwz-hmdp 高并发电商秒杀系统
 
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.0-6DB33F?style=flat-square&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
 [![Vue](https://img.shields.io/badge/Vue-3.5-42B883?style=flat-square&logo=vuedotjs&logoColor=white)](https://vuejs.org/)
@@ -7,14 +7,7 @@
 [![Docker Compose](https://img.shields.io/badge/Docker%20Compose-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=flat-square)](./LICENSE)
 
-围绕电商业务场景构建的全栈项目：核心是高并发秒杀、热点缓存、订单处理，具备基于本地文档知识库的 RAG 客服能力。
-
-本项目把 Lua 原子脚本、Redis Stream 异步下单、逻辑过期缓存、GEO 检索、Bitmap 签到、ZSet 点赞榜、Vue 3 管理台和 Docker Compose 运行环境放在了同一条可运行链路里。
-
-## 为什么值得看
-
-- **关键链路完整**：从前端请求到后端落库、缓存、异步消费、容器化运行，路径是打通的。
-- **实现工程约束**：秒杀资格判断前置到 Redis，订单异步消费走 Stream，热点缓存和穿透防护分策略处理，没有把高并发问题偷换成数据库热路径。
+这是一个电商高并发全栈项目，以Redis+Lua 原子脚本实现秒杀防超卖、Redis Stream完成异步下单，并通过逻辑过期缓存解决热点数据穿透与击穿问题。项目整合GEO 检索、Bitmap 签到、ZSet 点赞榜等 Redis 高级特性，搭配Vue3前端与Docker Compose容器化，形成可直接运行的完整业务链路。系统基于LangChain4j+Ollama+Milvus实现 RAG 客服，采用混合召回与引用溯源，兼顾高并发工程实践与大模型应用落地。
 
 ## 目录
 
