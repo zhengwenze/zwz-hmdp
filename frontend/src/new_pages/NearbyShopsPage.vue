@@ -1,239 +1,347 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { ElMessage } from "element-plus";
+import { shopApi } from "../services/shopApi";
+import { rememberShop } from "../stores/historyState";
+import { firstImage, formatDistance, formatPrice } from "../utils/view";
+
+const PAGE_SIZE = 10;
+
+const route = useRoute();
+const router = useRouter();
+
+const forms = reactive({
+  typeId: "",
+  current: "1",
+  x: "",
+  y: "",
+});
 
 const loading = ref(false);
+const locating = ref(false);
+const shopTypes = ref([]);
 const nearbyShops = ref([]);
 
-// TODO: 后续实现基于 GEO 的附近商铺查询
-// 1. 获取当前用户位置（浏览器 Geolocation API 或手动输入坐标）
-// 2. 调用后端 /shop/nearby 接口查询附近商铺
-// 3. 展示商铺列表（距离、名称、评分、图片等）
-// 4. 支持按距离排序、筛选
+const hasCoordinates = computed(() => forms.x !== "" && forms.y !== "");
+const pageCount = computed(
+  () => Number(forms.current) + (nearbyShops.value.length === PAGE_SIZE ? 1 : 0),
+);
+const selectedTypeName = computed(() => {
+  const selected = shopTypes.value.find(
+    (type) => String(type.id) === String(forms.typeId),
+  );
+  return selected?.name || "当前分类";
+});
 
-async function loadNearbyShops() {
+function asString(value, fallback = "") {
+  return typeof value === "string" ? value : fallback;
+}
+
+function applyQueryState() {
+  forms.typeId = asString(route.query.typeId, forms.typeId);
+  forms.current = asString(route.query.current, forms.current);
+  forms.x = asString(route.query.x);
+  forms.y = asString(route.query.y);
+}
+
+function buildQuery(overrides = {}) {
+  return {
+    typeId: forms.typeId || undefined,
+    current: forms.current || "1",
+    x: forms.x || undefined,
+    y: forms.y || undefined,
+    ...overrides,
+  };
+}
+
+function replaceQuery(overrides = {}) {
+  return router.replace({
+    name: "nearby-shops",
+    query: buildQuery(overrides),
+  });
+}
+
+function normalizeNumber(value) {
+  return Number(String(value).trim());
+}
+
+function validateCoordinates() {
+  const x = normalizeNumber(forms.x);
+  const y = normalizeNumber(forms.y);
+
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    ElMessage.warning("请输入有效的经纬度");
+    return false;
+  }
+  if (x < -180 || x > 180 || y < -90 || y > 90) {
+    ElMessage.warning("经度范围为 -180 到 180，纬度范围为 -90 到 90");
+    return false;
+  }
+  return true;
+}
+
+async function loadShopTypes() {
+  const { data, success } = await shopApi.fetchTypes({ silentError: true });
+  if (!success) {
+    return;
+  }
+  shopTypes.value = Array.isArray(data) ? data : [];
+  if (!forms.typeId && shopTypes.value.length) {
+    forms.typeId = String(shopTypes.value[0].id);
+  }
+}
+
+async function loadNearbyShops(options = {}) {
+  if (!forms.typeId) {
+    ElMessage.warning("请选择商铺分类");
+    return;
+  }
+  if (!hasCoordinates.value) {
+    ElMessage.warning("请输入经纬度或使用当前位置");
+    return;
+  }
+  if (!validateCoordinates()) {
+    return;
+  }
+
+  if (options.resetPage) {
+    forms.current = "1";
+  }
+  if (options.persist !== false) {
+    await replaceQuery();
+  }
+
   loading.value = true;
   try {
-    // TODO: 实现附近商铺查询逻辑
-    // const { data, success } = await shopApi.fetchNearby({ x, y, distance });
-    // if (success) {
-    //   nearbyShops.value = data || [];
-    // }
-    console.log("待实现：附近商铺查询功能");
+    const { data, success } = await shopApi.fetchByType(
+      {
+        typeId: forms.typeId,
+        current: forms.current,
+        x: normalizeNumber(forms.x),
+        y: normalizeNumber(forms.y),
+      },
+      options.notify ? { successMessage: "查询完成" } : { silentError: true },
+    );
+    if (success) {
+      nearbyShops.value = Array.isArray(data) ? data : [];
+    }
   } finally {
     loading.value = false;
   }
 }
 
-onMounted(() => {
-  loadNearbyShops();
+function useCurrentLocation() {
+  if (!navigator.geolocation) {
+    ElMessage.warning("当前浏览器不支持定位");
+    return;
+  }
+
+  locating.value = true;
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      forms.x = position.coords.longitude.toFixed(6);
+      forms.y = position.coords.latitude.toFixed(6);
+      locating.value = false;
+      loadNearbyShops({ resetPage: true, notify: true });
+    },
+    () => {
+      locating.value = false;
+      ElMessage.warning("无法获取当前位置，请手动输入经纬度");
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 60000,
+    },
+  );
+}
+
+function clearCoordinates() {
+  forms.x = "";
+  forms.y = "";
+  forms.current = "1";
+  nearbyShops.value = [];
+  replaceQuery({ x: undefined, y: undefined, current: "1" });
+}
+
+function handleTypeChange() {
+  forms.current = "1";
+  if (hasCoordinates.value) {
+    loadNearbyShops({ notify: true });
+    return;
+  }
+  replaceQuery({ current: "1" });
+}
+
+function changePage(page) {
+  forms.current = String(page);
+  loadNearbyShops({ notify: true });
+}
+
+function openShopDetail(shop) {
+  rememberShop(shop);
+  router.push({
+    name: "shop-detail",
+    params: { id: shop.id },
+    query: buildQuery(),
+  });
+}
+
+onMounted(async () => {
+  applyQueryState();
+  await loadShopTypes();
+  if (hasCoordinates.value) {
+    await loadNearbyShops({ persist: false });
+  }
 });
 </script>
 
 <template>
-  <div class="page-container">
-    <header class="page-header">
-      <h1 class="page-title">附近商铺</h1>
-      <p class="page-description">
-        基于地理位置查询附近的商铺，支持按距离排序和筛选。
-      </p>
-    </header>
-
-    <main class="page-main">
-      <!-- 占位提示 -->
-      <ElCard class="placeholder-card" shadow="hover">
-        <ElEmpty description="功能开发中，敬请期待">
-          <template #image>
-            <ElIcon :size="64" color="var(--el-color-info)">
-              <Location />
-            </ElIcon>
-          </template>
-          <div class="placeholder-tips">
-            <p>
-              <ElIcon><Location /></ElIcon>
-              即将支持的功能：
+  <section class="app-page">
+    <ElCard class="page-panel">
+      <template #header>
+        <div class="page-panel__header">
+          <div>
+            <h2 class="page-panel__title">附近商铺</h2>
+            <p class="page-panel__hint">
+              {{ selectedTypeName }} · Redis GEO 距离排序
             </p>
-            <ul>
-              <li>基于 GEO 地理位置查询附近商铺</li>
-              <li>按距离排序和范围筛选</li>
-              <li>显示商铺距离、评分、人均消费等信息</li>
-              <li>支持一键导航到商铺</li>
-            </ul>
           </div>
-        </ElEmpty>
+          <ElTag effect="plain">{{ nearbyShops.length }} 条</ElTag>
+        </div>
+      </template>
+
+      <ElCard shadow="never" class="page-panel filter-panel">
+        <ElForm inline label-position="top">
+          <ElFormItem label="分类">
+            <ElSelect
+              v-model="forms.typeId"
+              class="type-select"
+              @change="handleTypeChange"
+            >
+              <ElOption
+                v-for="type in shopTypes"
+                :key="type.id"
+                :label="type.name"
+                :value="String(type.id)"
+              />
+            </ElSelect>
+          </ElFormItem>
+          <ElFormItem label="经度 x">
+            <ElInput
+              v-model="forms.x"
+              class="coordinate-input"
+              placeholder="例如 121.499"
+              @keyup.enter="loadNearbyShops({ resetPage: true, notify: true })"
+            />
+          </ElFormItem>
+          <ElFormItem label="纬度 y">
+            <ElInput
+              v-model="forms.y"
+              class="coordinate-input"
+              placeholder="例如 31.239"
+              @keyup.enter="loadNearbyShops({ resetPage: true, notify: true })"
+            />
+          </ElFormItem>
+        </ElForm>
+
+        <div class="filter-actions">
+          <ElButton
+            type="primary"
+            :loading="loading"
+            @click="loadNearbyShops({ resetPage: true, notify: true })"
+          >
+            查询附近商铺
+          </ElButton>
+          <ElButton :loading="locating" @click="useCurrentLocation">
+            使用当前位置
+          </ElButton>
+          <ElButton @click="clearCoordinates">清空坐标</ElButton>
+        </div>
       </ElCard>
 
-      <!-- 后续实现的商铺列表区域 -->
-      <!-- <ElCard v-loading="loading" class="shops-card" shadow="never">
-        <template #header>
-          <div class="card-header">
-            <span>附近商铺</span>
-            <ElInput
-              v-model="searchKeyword"
-              placeholder="搜索商铺名称"
-              clearable
-              style="width: 200px"
-            >
-              <template #prefix>
-                <ElIcon><Search /></ElIcon>
-              </template>
-            </ElInput>
-          </div>
-        </template>
-
-        <ElRow :gutter="16">
-          <ElCol
-            v-for="shop in nearbyShops"
-            :key="shop.id"
-            :xs="24"
-            :sm="12"
-            :md="8"
-            :lg="6"
-          >
-            <ElCard :body-style="{ padding: '0px' }" shadow="hover">
+      <ElTable v-loading="loading" :data="nearbyShops" border stripe>
+        <ElTableColumn label="封面" width="100">
+          <template #default="{ row }">
+            <div class="thumb-image">
               <ElImage
-                :src="shop.icon || '/default-shop.png'"
+                v-if="firstImage(row.images)"
+                :src="firstImage(row.images)"
                 fit="cover"
-                style="width: 100%; height: 160px"
               />
-              <div class="shop-info">
-                <h3 class="shop-name">{{ shop.name }}</h3>
-                <p class="shop-distance">
-                  <ElIcon><Location /></ElIcon>
-                  {{ shop.distance }}m
-                </p>
-                <div class="shop-meta">
-                  <span class="shop-score">
-                    <ElIcon><Star /></ElIcon>
-                    {{ shop.score }}
-                  </span>
-                  <span class="shop-price">￥{{ shop.avgPrice }}/人</span>
-                </div>
-              </div>
-            </ElCard>
-          </ElCol>
-        </ElRow>
+              <div v-else class="thumb-image" />
+            </div>
+          </template>
+        </ElTableColumn>
+        <ElTableColumn prop="name" label="商铺名" min-width="180" />
+        <ElTableColumn prop="area" label="商圈" min-width="120" />
+        <ElTableColumn label="距离" width="120">
+          <template #default="{ row }">
+            <ElTag type="success" effect="plain">
+              {{ formatDistance(row.distance) }}
+            </ElTag>
+          </template>
+        </ElTableColumn>
+        <ElTableColumn label="评分" width="100">
+          <template #default="{ row }">
+            {{ ((row.score || 0) / 10).toFixed(1) }}
+          </template>
+        </ElTableColumn>
+        <ElTableColumn label="均价" width="110">
+          <template #default="{ row }">
+            ￥{{ formatPrice(row.avgPrice) }}
+          </template>
+        </ElTableColumn>
+        <ElTableColumn prop="address" label="地址" min-width="220" />
+        <ElTableColumn label="操作" width="120" fixed="right">
+          <template #default="{ row }">
+            <ElButton link type="primary" @click="openShopDetail(row)">
+              查看详情
+            </ElButton>
+          </template>
+        </ElTableColumn>
+        <template #empty>
+          <ElEmpty
+            :description="
+              hasCoordinates
+                ? '暂无附近商铺数据'
+                : '输入坐标或使用当前位置后查询'
+            "
+          />
+        </template>
+      </ElTable>
 
+      <div class="page-table-footer">
         <ElPagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :total="total"
-          layout="total, sizes, prev, pager, next, jumper"
-          :page-sizes="[10, 20, 50]"
-          style="margin-top: 24px; justify-content: center"
+          :current-page="Number(forms.current)"
+          :page-size="PAGE_SIZE"
+          :page-count="Math.max(pageCount, 1)"
+          layout="prev, pager, next"
+          @current-change="changePage"
         />
-      </ElCard> -->
-    </main>
-  </div>
+      </div>
+    </ElCard>
+  </section>
 </template>
 
 <style scoped>
-.page-container {
-  padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
+.filter-panel {
+  margin-bottom: 18px;
 }
 
-.page-header {
-  margin-bottom: 24px;
+.type-select {
+  width: 180px;
 }
 
-.page-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-  margin: 0 0 8px 0;
+.coordinate-input {
+  width: 180px;
 }
 
-.page-description {
-  font-size: 14px;
-  color: var(--el-text-color-secondary);
-  margin: 0;
-}
-
-.page-main {
-  min-height: 500px;
-}
-
-.placeholder-card {
-  text-align: center;
-}
-
-.placeholder-tips {
-  margin-top: 24px;
-  text-align: left;
-  max-width: 500px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.placeholder-tips p {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 500;
-  margin-bottom: 12px;
-  color: var(--el-color-primary);
-}
-
-.placeholder-tips ul {
-  margin: 0;
-  padding-left: 32px;
-}
-
-.placeholder-tips li {
-  margin: 8px 0;
-  color: var(--el-text-color-regular);
-  line-height: 1.6;
-}
-
-.shops-card {
-  margin-top: 24px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.shop-info {
-  padding: 12px;
-}
-
-.shop-name {
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--el-text-color-primary);
-  margin: 0 0 8px 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.shop-distance {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-  color: var(--el-color-primary);
-  margin: 0 0 8px 0;
-}
-
-.shop-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 13px;
-}
-
-.shop-score {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--el-color-warning);
-}
-
-.shop-price {
-  color: var(--el-text-color-secondary);
+@media (max-width: 720px) {
+  .type-select,
+  .coordinate-input {
+    width: 100%;
+  }
 }
 </style>
