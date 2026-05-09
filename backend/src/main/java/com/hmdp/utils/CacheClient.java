@@ -11,21 +11,42 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
-
 import java.time.LocalDateTime;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
-
 import static com.hmdp.utils.RedisConstants.*;
 
-// CacheClient.java 是缓存访问的统一工具类，封装 Redis 缓存读取、回源和重建策略。
-// 封装 Redis 缓存访问逻辑，统一处理缓存读取、数据库回源、空值缓存、逻辑过期、异步重建、冷 miss 并发保护。
-// 当前 CacheClient 对缓存三大问题都有处理：
-// 通过空值缓存解决缓存穿透；通过逻辑过期、互斥锁、异步重建解决热点 key 的缓存击穿；
-// 通过逻辑过期缓存不设置物理 TTL、逻辑过期时间增加随机抖动，部分缓解缓存雪崩。
-// 但它不能完整解决 Redis 宕机、批量 key 冷 miss、大量不同 key 同时失效等雪崩场景。
-// 所以更准确的说法是：解决了穿透和击穿，缓解了雪崩。
+/**
+ * <p>
+ * 缓存访问统一工具类，封装 Redis 缓存读取、数据库回源和缓存重建策略。
+ * </p>
+ *
+ * <h3>核心功能</h3>
+ * <ul>
+ * <li><strong>缓存穿透防护</strong>：通过空值缓存（缓存 null）避免大量请求查询不存在的数据</li>
+ * <li><strong>缓存击穿防护</strong>：通过逻辑过期 + 互斥锁 + 异步重建解决热点 Key 失效问题</li>
+ * <li><strong>缓存雪崩缓解</strong>：通过逻辑过期时间随机抖动避免大量 Key 同时失效</li>
+ * <li><strong>冷启动保护</strong>：通过互斥锁 + 双重检查 + 重试机制防止并发回源数据库</li>
+ * </ul>
+ *
+ * <h3>缓存策略说明</h3>
+ * <ul>
+ * <li><strong>逻辑过期</strong>：不设置物理 TTL，在数据中存储逻辑过期时间，避免缓存失效瞬间的高并发</li>
+ * <li><strong>异步重建</strong>：缓存过期后，由获取到锁的线程异步重建，其他线程返回旧数据</li>
+ * <li><strong>随机抖动</strong>：过期时间增加 60-600 秒随机抖动，避免雪崩（缓解非解决）</li>
+ * </ul>
+ *
+ * <h3>局限性说明</h3>
+ * <p>
+ * 本工具类解决了缓存穿透和缓存击穿问题，缓解了缓存雪崩问题。但以下场景仍需注意：
+ * </p>
+ * <ul>
+ * <li>Redis 宕机导致的缓存不可用</li>
+ * <li>批量不同 Key 冷启动导致的并发回源</li>
+ * <li>大量不同 Key 同时失效导致的雪崩</li>
+ * </ul>
+ */
 @Slf4j
 @Component
 public class CacheClient {
@@ -46,24 +67,31 @@ public class CacheClient {
     }
 
     /**
-     * 将任意对象序列化成json存入redis
+     * 将对象序列化为 JSON 字符串并存储到 Redis。
      *
-     * @param key   关键
-     * @param value 价值
-     * @param time  时间
-     * @param unit  单位
+     * @param key   Redis 键
+     * @param value 要存储的对象（任意类型）
+     * @param time  过期时间
+     * @param unit  时间单位
      */
     public void set(String key, Object value, Long time, TimeUnit unit) {
         stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(value), time, unit);
     }
 
     /**
-     * 将任意对象序列化成json存入redis 并且携带逻辑过期时间
+     * 将对象序列化为 JSON 并存储到 Redis，同时设置逻辑过期时间。
+     * <p>
+     * 逻辑过期特点：
+     * <ul>
+     * <li>不设置物理 TTL，缓存永不过期</li>
+     * <li>在数据中存储逻辑过期时间，由应用层判断是否过期</li>
+     * <li>过期时间增加随机抖动（60-600 秒），缓解缓存雪崩</li>
+     * </ul>
      *
-     * @param key   关键
-     * @param value 价值
-     * @param time  时间
-     * @param unit  单位
+     * @param key   Redis 键
+     * @param value 要存储的对象（任意类型）
+     * @param time  基础过期时间
+     * @param unit  时间单位
      */
     public void setWithLogicalExpire(String key, Object value, Long time, TimeUnit unit) {
         // 封装逻辑过期时间
@@ -83,15 +111,26 @@ public class CacheClient {
     }
 
     /**
-     * 设置空值解决缓存穿透
+     * 查询数据，使用缓存穿透防护策略。
+     * <p>
+     * 工作流程：
+     * <ol>
+     * <li>查询 Redis 缓存，命中则直接返回</li>
+     * <li>命中空值缓存（""），返回 null</li>
+     * <li>缓存未命中，查询数据库</li>
+     * <li>数据库不存在，写入空值缓存（防止穿透）</li>
+     * <li>数据库存在，写入 Redis 缓存</li>
+     * </ol>
      *
-     * @param keyPrefix  关键前缀
-     * @param id         id
-     * @param type       类型
-     * @param dbFallback db回退
-     * @param time       时间
-     * @param unit       单位
-     * @return {@link R}
+     * @param keyPrefix  Redis 键前缀（如 "cache:shop:"）
+     * @param id         业务 ID
+     * @param type       目标类型
+     * @param dbFallback 数据库回源函数（如 this::getById）
+     * @param time       缓存过期时间
+     * @param unit       时间单位
+     * @param <R>        返回类型
+     * @param <ID>       ID 类型
+     * @return 缓存或数据库中的业务对象，不存在则返回 null
      */
     public <R, ID> R queryWithPassThrough(
             String keyPrefix, ID id, Class<R> type, Function<ID, R> dbFallback, Long time, TimeUnit unit) {
@@ -122,9 +161,31 @@ public class CacheClient {
     }
 
     /**
-     * 逻辑过期解决缓存击穿
+     * 查询数据，使用逻辑过期解决缓存击穿问题。
+     * <p>
+     * 工作流程：
+     * <ol>
+     * <li>查询 Redis 缓存，解析逻辑过期时间</li>
+     * <li>缓存未命中（冷启动），使用互斥锁 + 双重检查 + 重试机制保护</li>
+     * <li>缓存格式无效，删除后重新加载</li>
+     * <li>命中空值缓存，返回 null</li>
+     * <li>缓存命中且未过期，直接返回</li>
+     * <li>缓存已过期：
+     * <ul>
+     * <li>获取互斥锁成功：提交异步重建任务，返回旧数据</li>
+     * <li>获取互斥锁失败：跳过重建，返回旧数据</li>
+     * </ul>
+     * </li>
+     * </ol>
      *
-     * @param id id
+     * @param keyPrefix  Redis 键前缀（如 "cache:shop:"）
+     * @param id         业务 ID
+     * @param type       目标类型
+     * @param dbFallback 数据库回源函数（如 this::getById）
+     * @param time       基础过期时间
+     * @param unit       时间单位
+     * @param <R>        返回类型
+     * @param <ID>       ID 类型
      * @return 缓存或数据库中的业务对象
      */
     public <R, ID> R queryWithLogicalExpire(String keyPrefix, ID id, Class<R> type, Function<ID, R> dbFallback,
@@ -289,10 +350,10 @@ public class CacheClient {
     }
 
     /**
-     * 获取锁
+     * 获取互斥锁（基于 Redis SETNX）。
      *
-     * @param key 关键
-     * @return boolean
+     * @param key 锁的 Redis 键
+     * @return 获取锁是否成功
      */
     private boolean tryLock(String key) {
         Boolean flag = stringRedisTemplate.opsForValue().setIfAbsent(key, "1", LOCK_SHOP_TTL, TimeUnit.SECONDS);
@@ -300,9 +361,9 @@ public class CacheClient {
     }
 
     /**
-     * 释放锁
+     * 释放互斥锁。
      *
-     * @param key 关键
+     * @param key 锁的 Redis 键
      */
     private void unLock(String key) {
         stringRedisTemplate.delete(key);
