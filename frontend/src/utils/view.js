@@ -17,9 +17,11 @@ export function firstImage(rawValue) {
 }
 
 function isRenderableImage(value) {
-  return /^https?:\/\//.test(value)
-    || value.startsWith("/")
-    || /\.(png|jpe?g|gif|webp|svg)$/i.test(value);
+  return (
+    /^https?:\/\//.test(value) ||
+    value.startsWith("/") ||
+    /\.(png|jpe?g|gif|webp|svg)$/i.test(value)
+  );
 }
 
 export function formatPrice(value) {

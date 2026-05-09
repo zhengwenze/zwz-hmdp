@@ -42,13 +42,15 @@ function normalizeNoticeMessage(type, message) {
 
 export const useAppStore = defineStore("app", () => {
   const apiBaseUrl = ref(
-    localStorage.getItem("hmdp-api-base") || import.meta.env.VITE_API_BASE_URL || "",
+    localStorage.getItem("hmdp-api-base") ||
+      import.meta.env.VITE_API_BASE_URL ||
+      "",
   );
   const assetBaseUrl = ref(
-    localStorage.getItem("hmdp-asset-base")
-      || import.meta.env.VITE_ASSET_BASE_URL
-      || import.meta.env.VITE_API_BASE_URL
-      || "",
+    localStorage.getItem("hmdp-asset-base") ||
+      import.meta.env.VITE_ASSET_BASE_URL ||
+      import.meta.env.VITE_API_BASE_URL ||
+      "",
   );
   const notice = reactive({
     type: "info",
@@ -68,7 +70,9 @@ export const useAppStore = defineStore("app", () => {
   }
 
   watch(apiBaseUrl, (value) => localStorage.setItem("hmdp-api-base", value));
-  watch(assetBaseUrl, (value) => localStorage.setItem("hmdp-asset-base", value));
+  watch(assetBaseUrl, (value) =>
+    localStorage.setItem("hmdp-asset-base", value),
+  );
 
   return {
     apiBaseUrl,

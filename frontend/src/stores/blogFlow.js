@@ -56,7 +56,8 @@ export const useBlogFlowStore = defineStore("blogFlow", () => {
 
   watch(
     uploadedImages,
-    (value) => localStorage.setItem("hmdp-uploaded-images", JSON.stringify(value)),
+    (value) =>
+      localStorage.setItem("hmdp-uploaded-images", JSON.stringify(value)),
     { deep: true },
   );
 
