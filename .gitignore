@@ -34,6 +34,10 @@ build/
 
 ### Temp directories ###
 .tmp/
+*.log
+!backend/logs/
+
+### Documentation ###
 docs/*
 !docs/database-review.md
 !docs/rag/
