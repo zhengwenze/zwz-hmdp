@@ -3,7 +3,6 @@ package com.hmdp.utils;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.json.JSONUtil;
-import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.hmdp.config.AsyncExecutorConfig.CacheRebuildTask;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -137,20 +136,14 @@ public class CacheClient {
         String key = keyPrefix + id;
         // 从redis中查询
         String json = stringRedisTemplate.opsForValue().get(key);
-        // 判断是否存在
-        if (StringUtils.isNotEmpty(json)) {
-            // 存在直接返回
-            return JSONUtil.toBean(json, type);
-        }
-        // 判断空值
-        if ("".equals(json)) {
-            return null;
+        if (json != null) {
+            return json.isEmpty() ? null : JSONUtil.toBean(json, type);
         }
         // 不存在 查询数据库
         R r = dbFallback.apply(id);
         if (r == null) {
             // redis写入空值
-            stringRedisTemplate.opsForValue().set(key, "", CACHE_NULL_TTL, TimeUnit.SECONDS);
+            setEmptyCache(key);
             // 数据库不存在 返回错误
             return null;
         }
@@ -195,10 +188,6 @@ public class CacheClient {
         if (lookup.isMiss()) {
             return queryColdMiss(key, id, type, dbFallback, time, unit);
         }
-        if (lookup.isInvalid()) {
-            stringRedisTemplate.delete(key);
-            return queryColdMiss(key, id, type, dbFallback, time, unit);
-        }
         if (lookup.isEmpty()) {
             return null;
         }
@@ -237,9 +226,6 @@ public class CacheClient {
                             lookup.status);
                     return lookup.value;
                 }
-                if (lookup.isInvalid()) {
-                    stringRedisTemplate.delete(key);
-                }
                 return loadAndSetLogicalExpire(key, id, dbFallback, time, unit);
             } finally {
                 unLock(lockKey);
@@ -259,12 +245,6 @@ public class CacheClient {
                 log.debug("Logical cache cold miss retry resolved: cacheKey={}, retry={}, status={}", key, retry,
                         lookup.status);
                 return lookup.value;
-            }
-            if (lookup.isInvalid()) {
-                stringRedisTemplate.delete(key);
-                log.debug("Logical cache cold miss retry found invalid cache, stop retrying: cacheKey={}, retry={}",
-                        key, retry);
-                break;
             }
         }
 
@@ -307,26 +287,15 @@ public class CacheClient {
             redisData = JSONUtil.toBean(json, RedisData.class);
         } catch (Exception e) {
             log.warn("Invalid logical cache data, fallback to DB: cacheKey={}", key, e);
-            return CacheLookup.invalid();
+            return CacheLookup.miss();
         }
 
         LocalDateTime expireTime = redisData.getExpireTime();
-        if (expireTime == null) {
-            try {
-                R r = JSONUtil.toBean(json, type);
-                setWithLogicalExpire(key, r, time, unit);
-                log.debug("Migrated legacy cache to logical expire format: cacheKey={}", key);
-                return CacheLookup.hit(r);
-            } catch (Exception e) {
-                log.warn("Invalid legacy cache data, fallback to DB: cacheKey={}", key, e);
-                return CacheLookup.invalid();
-            }
-        }
 
         Object data = redisData.getData();
         if (data == null) {
             log.warn("Invalid logical cache payload, fallback to DB: cacheKey={}", key);
-            return CacheLookup.invalid();
+            return CacheLookup.miss();
         }
 
         R r = BeanUtil.toBean(data, type);
@@ -340,7 +309,7 @@ public class CacheClient {
             TimeUnit unit) {
         R r = dbFallback.apply(id);
         if (r == null) {
-            stringRedisTemplate.opsForValue().set(key, "", CACHE_NULL_TTL, TimeUnit.SECONDS);
+            setEmptyCache(key);
             log.debug("Set empty cache after DB miss: cacheKey={}, ttlSeconds={}", key, CACHE_NULL_TTL);
             return null;
         }
@@ -360,11 +329,10 @@ public class CacheClient {
         return BooleanUtil.isTrue(flag);
     }
 
-    /**
-     * 释放互斥锁。
-     *
-     * @param key 锁的 Redis 键
-     */
+    private void setEmptyCache(String key) {
+        stringRedisTemplate.opsForValue().set(key, "", CACHE_NULL_TTL, TimeUnit.SECONDS);
+    }
+
     private void unLock(String key) {
         stringRedisTemplate.delete(key);
     }
@@ -402,7 +370,7 @@ public class CacheClient {
             try {
                 R newR = dbFallback.apply(id);
                 if (newR == null) {
-                    stringRedisTemplate.opsForValue().set(cacheKey, "", CACHE_NULL_TTL, TimeUnit.SECONDS);
+                    setEmptyCache(cacheKey);
                     log.debug("Cache rebuild completed with empty value: cacheKey={}", cacheKey);
                 } else {
                     setWithLogicalExpire(cacheKey, newR, time, unit);
@@ -420,8 +388,7 @@ public class CacheClient {
         MISS,
         EMPTY,
         HIT,
-        EXPIRED,
-        INVALID
+        EXPIRED
     }
 
     private static final class CacheLookup<R> {
@@ -449,10 +416,6 @@ public class CacheClient {
             return new CacheLookup<>(CacheStatus.EXPIRED, value);
         }
 
-        private static <R> CacheLookup<R> invalid() {
-            return new CacheLookup<>(CacheStatus.INVALID, null);
-        }
-
         private boolean isMiss() {
             return status == CacheStatus.MISS;
         }
@@ -463,10 +426,6 @@ public class CacheClient {
 
         private boolean isHit() {
             return status == CacheStatus.HIT;
-        }
-
-        private boolean isInvalid() {
-            return status == CacheStatus.INVALID;
         }
 
         private boolean isResolved() {
