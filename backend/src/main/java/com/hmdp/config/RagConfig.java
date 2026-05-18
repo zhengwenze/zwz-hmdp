@@ -1,9 +1,11 @@
 package com.hmdp.config;
 
 import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.StreamingChatLanguageModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.ollama.OllamaChatModel;
 import dev.langchain4j.model.ollama.OllamaEmbeddingModel;
+import dev.langchain4j.model.ollama.OllamaStreamingChatModel;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,6 +20,15 @@ public class RagConfig {
     @Bean
     public ChatLanguageModel ragChatModel(RagProperties properties) {
         return OllamaChatModel.builder()
+                .baseUrl(properties.getOllamaBaseUrl())
+                .modelName(properties.getChatModel())
+                .timeout(Duration.ofMinutes(2))
+                .build();
+    }
+
+    @Bean
+    public StreamingChatLanguageModel ragStreamingChatModel(RagProperties properties) {
+        return OllamaStreamingChatModel.builder()
                 .baseUrl(properties.getOllamaBaseUrl())
                 .modelName(properties.getChatModel())
                 .timeout(Duration.ofMinutes(2))

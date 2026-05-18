@@ -15,6 +15,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,7 +27,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(RagController.class)
@@ -69,6 +74,31 @@ class RagControllerTest {
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.success").value(false))
                                 .andExpect(jsonPath("$.errorMsg").value("模型不可用"));
+        }
+
+        @Test
+        void streamChat_shouldReturnSseEmitter() throws Exception {
+                SseEmitter emitter = new SseEmitter();
+                when(ragService.streamChat(any(RagChatRequest.class))).thenReturn(emitter);
+
+                MvcResult result = mockMvc.perform(post("/rag/chat/stream")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .accept(MediaType.TEXT_EVENT_STREAM)
+                                .content("{\"sessionId\":\"s1\",\"question\":\"附近有什么推荐？\"}"))
+                                .andExpect(request().asyncStarted())
+                                .andReturn();
+
+                emitter.send(SseEmitter.event().name("done").data("ok"));
+                emitter.complete();
+
+                mockMvc.perform(asyncDispatch(result))
+                                .andExpect(status().isOk())
+                                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM));
+
+                ArgumentCaptor<RagChatRequest> captor = ArgumentCaptor.forClass(RagChatRequest.class);
+                verify(ragService).streamChat(captor.capture());
+                assertEquals("s1", captor.getValue().getSessionId());
+                assertEquals("附近有什么推荐？", captor.getValue().getQuestion());
         }
 
         @Test
@@ -148,5 +178,30 @@ class RagControllerTest {
                                 .andExpect(jsonPath("$.data.status").value("SUCCESS"));
 
                 verify(ragService).latestJob();
+        }
+}
+
+@WebMvcTest(RagStreamDisabledController.class)
+@ContextConfiguration(classes = RagStreamDisabledController.class)
+@TestPropertySource(properties = "rag.enabled=false")
+class RagStreamDisabledControllerTest {
+
+        @Autowired
+        private MockMvc mockMvc;
+
+        @Test
+        void streamChat_shouldReturnErrorEventWhenRagDisabled() throws Exception {
+                MvcResult result = mockMvc.perform(post("/rag/chat/stream")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .accept(MediaType.TEXT_EVENT_STREAM)
+                                .content("{\"question\":\"问题\"}"))
+                                .andExpect(request().asyncStarted())
+                                .andReturn();
+
+                mockMvc.perform(asyncDispatch(result))
+                                .andExpect(status().isOk())
+                                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
+                                .andExpect(content().string(org.hamcrest.Matchers.containsString("event:error")))
+                                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"message\"")));
         }
 }

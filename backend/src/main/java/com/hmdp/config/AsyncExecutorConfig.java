@@ -37,6 +37,12 @@ public class AsyncExecutorConfig {
         return buildExecutor("ragRebuildExecutor", properties.getRagRebuild(), new ThreadPoolExecutor.AbortPolicy());
     }
 
+    @Bean("ragChatStreamExecutor")
+    public ThreadPoolTaskExecutor ragChatStreamExecutor(AsyncExecutorProperties properties) {
+        return buildExecutor("ragChatStreamExecutor", properties.getRagChatStream(),
+                new ThreadPoolExecutor.AbortPolicy());
+    }
+
     private ThreadPoolTaskExecutor buildExecutor(String beanName, AsyncExecutorProperties.ExecutorProperties properties,
             RejectedExecutionHandler rejectedExecutionHandler) {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();

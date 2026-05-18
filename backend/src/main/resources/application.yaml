@@ -43,6 +43,13 @@ hmdp:
       keep-alive-seconds: 60
       thread-name-prefix: hmdp-rag-rebuild-
       await-termination-seconds: 60
+    rag-chat-stream:
+      core-size: 2
+      max-size: 8
+      queue-capacity: 50
+      keep-alive-seconds: 60
+      thread-name-prefix: hmdp-rag-stream-
+      await-termination-seconds: 60
 rag:
   enabled: ${RAG_ENABLED:false}
   docs-dir: ${RAG_DOCS_DIR:docs/rag}

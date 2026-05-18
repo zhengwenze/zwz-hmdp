@@ -11,6 +11,7 @@ import com.hmdp.dto.RagDocumentDTO;
 import com.hmdp.dto.RagIngestJobDTO;
 import com.hmdp.dto.RagReferenceDTO;
 import com.hmdp.dto.RagStatusDTO;
+import com.hmdp.dto.RagStreamMetaDTO;
 import com.hmdp.dto.RagTurn;
 import com.hmdp.entity.KnowledgeChunk;
 import com.hmdp.entity.KnowledgeDocument;
@@ -30,7 +31,10 @@ import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.StreamingChatLanguageModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.model.output.Response;
+import dev.langchain4j.model.StreamingResponseHandler;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingSearchResult;
@@ -45,9 +49,11 @@ import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -94,6 +100,8 @@ public class RagServiceImpl implements IRagService {
     @Resource
     private ChatLanguageModel ragChatModel;
     @Resource
+    private StreamingChatLanguageModel ragStreamingChatModel;
+    @Resource
     private KnowledgeDocumentMapper knowledgeDocumentMapper;
     @Resource
     private KnowledgeChunkMapper knowledgeChunkMapper;
@@ -107,6 +115,8 @@ public class RagServiceImpl implements IRagService {
     private ObjectMapper objectMapper;
     @Resource(name = "ragRebuildExecutor")
     private ThreadPoolTaskExecutor ragRebuildExecutor;
+    @Resource(name = "ragChatStreamExecutor")
+    private ThreadPoolTaskExecutor ragChatStreamExecutor;
 
     private final AtomicBoolean rebuilding = new AtomicBoolean(false);
     private final AtomicBoolean knowledgeTablesReady = new AtomicBoolean(false);
@@ -175,6 +185,187 @@ public class RagServiceImpl implements IRagService {
                     "RAG chat finished: traceId={}, question={}, retrievedCount={}, topScore={}, model={}, latencyMs={}",
                     traceId, question, retrievedCount, topScore, ragProperties.getChatModel(), latencyMillis);
         }
+    }
+
+    @Override
+    public SseEmitter streamChat(RagChatRequest request) {
+        SseEmitter emitter = new SseEmitter(TimeUnit.MINUTES.toMillis(5));
+        try {
+            ragChatStreamExecutor.execute(() -> doStreamChat(request, emitter));
+        } catch (Exception e) {
+            log.warn("RAG stream task rejected: reason={}", rootMessage(e), e);
+            sendEventAndComplete(emitter, "error", Map.of("message", "RAG 流式问答任务繁忙，请稍后重试"));
+        }
+        return emitter;
+    }
+
+    private void doStreamChat(RagChatRequest request, SseEmitter emitter) {
+        String question = request.getQuestion().trim();
+        String sessionId = normalizeSessionId(request.getSessionId());
+        boolean useAnswerCache = sessionId.isBlank();
+        String traceId = UUID.randomUUID().toString();
+        String answerCacheKey = RedisConstants.RAG_ANSWER_CACHE_KEY + sha256(question);
+        long startNanos = System.nanoTime();
+        AtomicBoolean completed = new AtomicBoolean(false);
+        StringBuilder answerBuilder = new StringBuilder();
+        int retrievedCount = 0;
+        Double topScore = null;
+
+        try {
+            ensureKnowledgeTables();
+
+            if (useAnswerCache) {
+                RagChatResponse cached = readCachedResponse(answerCacheKey);
+                if (cached != null) {
+                    String cachedAnswer = cached.getAnswer() == null ? "" : cached.getAnswer();
+                    RagStreamMetaDTO meta = new RagStreamMetaDTO(
+                            cached.getTraceId(),
+                            sessionId,
+                            cached.getReferences(),
+                            cached.getCitations(),
+                            cached.getGrounded(),
+                            true);
+                    sendEvent(emitter, "meta", meta);
+                    sendEvent(emitter, "delta", Map.of("text", cachedAnswer));
+                    sendEvent(emitter, "done", cached);
+                    saveTurn(sessionId, question, cachedAnswer);
+                    completeEmitter(emitter, completed);
+                    return;
+                }
+            }
+
+            List<RetrievedChunk> denseMatches = denseRetrieve(question);
+            List<RetrievedChunk> keywordMatches = keywordRetrieve(question);
+            List<RetrievedChunk> fusedMatches = reciprocalRankFuse(denseMatches, keywordMatches);
+            retrievedCount = fusedMatches.size();
+            topScore = fusedMatches.stream()
+                    .map(RetrievedChunk::getScore)
+                    .filter(Objects::nonNull)
+                    .max(Double::compareTo)
+                    .orElse(null);
+            List<RagReferenceDTO> references = fusedMatches.stream()
+                    .map(RagServiceImpl::toReference)
+                    .toList();
+            List<RagCitationDTO> citations = fusedMatches.stream()
+                    .map(RagServiceImpl::toCitation)
+                    .toList();
+            boolean grounded = !references.isEmpty();
+
+            sendEvent(emitter, "meta", new RagStreamMetaDTO(
+                    traceId,
+                    sessionId,
+                    references,
+                    citations,
+                    grounded,
+                    false));
+
+            if (fusedMatches.isEmpty()) {
+                sendEvent(emitter, "delta", Map.of("text", NO_KNOWLEDGE_ANSWER));
+                finishStreamAnswer(
+                        emitter,
+                        completed,
+                        question,
+                        sessionId,
+                        useAnswerCache,
+                        answerCacheKey,
+                        NO_KNOWLEDGE_ANSWER,
+                        references,
+                        citations,
+                        grounded,
+                        traceId);
+                log.debug("RAG stream returned no-knowledge answer: traceId={}, sessionId={}", traceId, sessionId);
+                return;
+            }
+
+            List<ChatMessage> messages = buildChatMessages(sessionId, question, fusedMatches, traceId);
+            ragStreamingChatModel.generate(messages, new StreamingResponseHandler<AiMessage>() {
+                @Override
+                public void onNext(String token) {
+                    if (completed.get() || token == null || token.isEmpty()) {
+                        return;
+                    }
+                    synchronized (answerBuilder) {
+                        answerBuilder.append(token);
+                    }
+                    try {
+                        sendEvent(emitter, "delta", Map.of("text", token));
+                    } catch (Exception e) {
+                        log.warn("Failed to send RAG stream delta: traceId={}, sessionId={}, reason={}",
+                                traceId, sessionId, rootMessage(e), e);
+                        completeEmitterWithError(emitter, completed, e);
+                        throw new IllegalStateException("SSE client disconnected", e);
+                    }
+                }
+
+                @Override
+                public void onComplete(Response<AiMessage> response) {
+                    if (completed.get()) {
+                        return;
+                    }
+                    String answer;
+                    synchronized (answerBuilder) {
+                        answer = answerBuilder.toString().trim();
+                    }
+                    finishStreamAnswer(
+                            emitter,
+                            completed,
+                            question,
+                            sessionId,
+                            useAnswerCache,
+                            answerCacheKey,
+                            answer,
+                            references,
+                            citations,
+                            grounded,
+                            traceId);
+                }
+
+                @Override
+                public void onError(Throwable error) {
+                    log.error("RAG stream model failed: traceId={}, sessionId={}, model={}",
+                            traceId, sessionId, ragProperties.getChatModel(), error);
+                    sendStreamError(emitter, completed, traceId, sessionId,
+                            "RAG 流式问答暂不可用: " + rootMessage(error));
+                }
+            });
+        } catch (Exception e) {
+            log.error("RAG stream failed: traceId={}, sessionId={}, question={}", traceId, sessionId, question, e);
+            sendStreamError(emitter, completed, traceId, sessionId, "RAG 流式问答暂不可用: " + rootMessage(e));
+        } finally {
+            long latencyMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+            log.info(
+                    "RAG stream submitted: traceId={}, sessionId={}, question={}, retrievedCount={}, topScore={}, model={}, latencyMs={}",
+                    traceId, sessionId, question, retrievedCount, topScore, ragProperties.getChatModel(), latencyMillis);
+        }
+    }
+
+    private RagChatResponse finishStreamAnswer(
+            SseEmitter emitter,
+            AtomicBoolean completed,
+            String question,
+            String sessionId,
+            boolean useAnswerCache,
+            String answerCacheKey,
+            String answer,
+            List<RagReferenceDTO> references,
+            List<RagCitationDTO> citations,
+            boolean grounded,
+            String traceId) {
+        String finalAnswer = answer == null || answer.isBlank() ? NO_KNOWLEDGE_ANSWER : answer;
+        RagChatResponse response = new RagChatResponse(finalAnswer, references, citations, grounded, traceId);
+        if (useAnswerCache) {
+            cacheResponse(answerCacheKey, response);
+        }
+        saveTurn(sessionId, question, finalAnswer);
+        try {
+            sendEvent(emitter, "done", response);
+            completeEmitter(emitter, completed);
+        } catch (Exception e) {
+            log.warn("Failed to finish RAG stream: traceId={}, sessionId={}, reason={}",
+                    traceId, sessionId, rootMessage(e), e);
+            completeEmitterWithError(emitter, completed, e);
+        }
+        return response;
     }
 
     @Override
@@ -725,6 +916,11 @@ public class RagServiceImpl implements IRagService {
     }
 
     private String askModel(String sessionId, String question, List<RetrievedChunk> chunks, String traceId) {
+        return ragChatModel.generate(buildChatMessages(sessionId, question, chunks, traceId)).content().text().trim();
+    }
+
+    private List<ChatMessage> buildChatMessages(String sessionId, String question, List<RetrievedChunk> chunks,
+            String traceId) {
         List<ChatMessage> messages = new ArrayList<>();
         messages.add(SystemMessage.from(
                 "你是黑马点评 HMDP 项目的智能客服。\n" +
@@ -736,7 +932,52 @@ public class RagServiceImpl implements IRagService {
             messages.add(AiMessage.from(turn.getAnswer()));
         });
         messages.add(UserMessage.from(buildPrompt(question, chunks, traceId)));
-        return ragChatModel.generate(messages).content().text().trim();
+        return messages;
+    }
+
+    private void sendEvent(SseEmitter emitter, String eventName, Object data) throws IOException {
+        synchronized (emitter) {
+            emitter.send(SseEmitter.event()
+                    .name(eventName)
+                    .data(data, MediaType.APPLICATION_JSON));
+        }
+    }
+
+    private void sendEventAndComplete(SseEmitter emitter, String eventName, Object data) {
+        try {
+            sendEvent(emitter, eventName, data);
+            emitter.complete();
+        } catch (Exception e) {
+            emitter.completeWithError(e);
+        }
+    }
+
+    private void sendStreamError(SseEmitter emitter, AtomicBoolean completed, String traceId, String sessionId,
+            String message) {
+        if (!completed.compareAndSet(false, true)) {
+            return;
+        }
+        try {
+            sendEvent(emitter, "error", Map.of(
+                    "message", message,
+                    "traceId", traceId,
+                    "sessionId", sessionId));
+            emitter.complete();
+        } catch (Exception e) {
+            emitter.completeWithError(e);
+        }
+    }
+
+    private void completeEmitter(SseEmitter emitter, AtomicBoolean completed) {
+        if (completed.compareAndSet(false, true)) {
+            emitter.complete();
+        }
+    }
+
+    private void completeEmitterWithError(SseEmitter emitter, AtomicBoolean completed, Throwable error) {
+        if (completed.compareAndSet(false, true)) {
+            emitter.completeWithError(error);
+        }
     }
 
     private String buildPrompt(String question, List<RetrievedChunk> chunks, String traceId) {

@@ -87,18 +87,72 @@ async function sendQuestion() {
     traceId: "",
   });
 
-  const { data, success } = await ragApi.chat(
+  const assistantMessage = {
+    role: "assistant",
+    content: "",
+    references: [],
+    citations: [],
+    traceId: "",
+  };
+  conversations.value.push(assistantMessage);
+  const assistantIndex = conversations.value.length - 1;
+
+  const updateAssistant = (patch) => {
+    conversations.value[assistantIndex] = {
+      ...conversations.value[assistantIndex],
+      ...patch,
+    };
+  };
+
+  const streamResult = await ragApi.chatStream(
     { sessionId: sessionId.value, question: userQuestion },
+    {
+      onMeta(data) {
+        updateAssistant({
+          traceId: data?.traceId || "",
+          references: data?.references || [],
+          citations: data?.citations || [],
+        });
+      },
+      onDelta(data) {
+        const text = typeof data === "string" ? data : data?.text;
+        if (!text) {
+          return;
+        }
+        updateAssistant({
+          content: `${conversations.value[assistantIndex].content}${text}`,
+        });
+      },
+      onDone(data) {
+        updateAssistant({
+          content: data?.answer || conversations.value[assistantIndex].content || "暂无回答",
+          references: data?.references || conversations.value[assistantIndex].references || [],
+          citations: data?.citations || conversations.value[assistantIndex].citations || [],
+          traceId: data?.traceId || conversations.value[assistantIndex].traceId || "",
+        });
+      },
+      onError(data) {
+        updateAssistant({
+          content: data?.message || "RAG 流式问答暂不可用",
+        });
+      },
+    },
     { silentError: false },
   );
-  if (success && data) {
-    conversations.value.push({
-      role: "assistant",
-      content: data.answer || "暂无回答",
-      references: data.references || [],
-      citations: data.citations || [],
-      traceId: data.traceId || "",
-    });
+
+  if (!streamResult.success && !conversations.value[assistantIndex].content) {
+    const { data, success } = await ragApi.chat(
+      { sessionId: sessionId.value, question: userQuestion },
+      { silentError: false },
+    );
+    if (success && data) {
+      updateAssistant({
+        content: data.answer || "暂无回答",
+        references: data.references || [],
+        citations: data.citations || [],
+        traceId: data.traceId || "",
+      });
+    }
   }
   sending.value = false;
 }

@@ -12,6 +12,7 @@ public class AsyncExecutorProperties {
     private ExecutorProperties seckillOrder = new ExecutorProperties();
     private ExecutorProperties cacheRebuild = new ExecutorProperties();
     private ExecutorProperties ragRebuild = new ExecutorProperties();
+    private ExecutorProperties ragChatStream = new ExecutorProperties();
 
     @Data
     public static class ExecutorProperties {
