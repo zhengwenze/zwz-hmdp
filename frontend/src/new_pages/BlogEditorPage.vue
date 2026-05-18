@@ -6,6 +6,7 @@ import { shopApi } from "../services/shopApi";
 import { blogApi } from "../services/blogApi";
 import { uploadApi } from "../services/uploadApi";
 import { setNotice, toAssetUrl } from "../stores/appState";
+import { buildRedirectPath, isAuthenticated } from "../stores/session";
 import { historyState, rememberShop } from "../stores/historyState";
 
 const router = useRouter();
@@ -80,8 +81,16 @@ function selectShop(shop) {
 }
 
 async function publishBlog() {
+  if (!isAuthenticated()) {
+    router.push(buildRedirectPath("/blog/editor"));
+    return;
+  }
   if (!blogFlowState.draft.title.trim() || !blogFlowState.draft.content.trim()) {
     setNotice("error", "标题和正文不能为空。");
+    return;
+  }
+  if (!blogFlowState.draft.images.length) {
+    setNotice("error", "请至少上传一张封面图。");
     return;
   }
   if (!blogFlowState.draft.shopId) {
@@ -89,7 +98,7 @@ async function publishBlog() {
     return;
   }
 
-  const { success } = await blogApi.create(
+  const { success, data } = await blogApi.create(
     {
       title: blogFlowState.draft.title,
       content: blogFlowState.draft.content,
@@ -107,7 +116,7 @@ async function publishBlog() {
     blogFlowState.draft.shopId = "";
     blogFlowState.draft.shopName = "";
     blogFlowState.draft.images = [];
-    router.push("/blog");
+    router.push(data ? `/blog/detail/${data}` : "/blog");
   }
 }
 </script>
@@ -118,11 +127,11 @@ async function publishBlog() {
       <template #header>
         <div class="page-panel__header">
           <div>
-            <h2 class="page-panel__title">独立笔记编辑页</h2>
-            <p class="page-panel__hint">适合处理图片上传、选店和完整草稿编辑。</p>
+            <h2 class="page-panel__title">发布笔记</h2>
+            <p class="page-panel__hint">写标题、正文，上传封面并关联店铺。</p>
           </div>
           <div class="page-actions">
-            <ElButton @click="router.push('/blog')">返回笔记页</ElButton>
+            <ElButton @click="router.push('/blog')">返回广场</ElButton>
             <ElButton type="primary" @click="publishBlog">发布笔记</ElButton>
           </div>
         </div>

@@ -90,16 +90,25 @@ class UserControllerTest {
 
     @Test
     void me_shouldReturnCurrentUserFromUserHolder() throws Exception {
-        UserDTO user = new UserDTO();
+        UserDTO currentUser = new UserDTO();
+        currentUser.setId(7L);
+        currentUser.setNickName("测试用户");
+        UserHolder.saveUser(currentUser);
+
+        User user = new User();
         user.setId(7L);
         user.setNickName("测试用户");
-        UserHolder.saveUser(user);
+        user.setPhone("13800138000");
+        when(userService.getById(7L)).thenReturn(user);
 
         mockMvc.perform(get("/user/me"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(7))
-                .andExpect(jsonPath("$.data.nickName").value("测试用户"));
+                .andExpect(jsonPath("$.data.nickName").value("测试用户"))
+                .andExpect(jsonPath("$.data.phone").value("13800138000"));
+
+        verify(userService).getById(7L);
     }
 
     @Test

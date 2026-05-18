@@ -6,7 +6,7 @@ import { shopApi } from "../services/shopApi";
 import { rememberShop } from "../stores/historyState";
 import { firstImage, formatDistance, formatPrice } from "../utils/view";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 
 const route = useRoute();
 const router = useRouter();
@@ -24,6 +24,7 @@ const shopTypes = ref([]);
 const nearbyShops = ref([]);
 
 const hasCoordinates = computed(() => forms.x !== "" && forms.y !== "");
+const hasPartialCoordinates = computed(() => forms.x !== "" || forms.y !== "");
 const pageCount = computed(
   () => Number(forms.current) + (nearbyShops.value.length === PAGE_SIZE ? 1 : 0),
 );
@@ -97,11 +98,7 @@ async function loadNearbyShops(options = {}) {
     ElMessage.warning("请选择商铺分类");
     return;
   }
-  if (!hasCoordinates.value) {
-    ElMessage.warning("请输入经纬度或使用当前位置");
-    return;
-  }
-  if (!validateCoordinates()) {
+  if (hasPartialCoordinates.value && !validateCoordinates()) {
     return;
   }
 
@@ -114,13 +111,16 @@ async function loadNearbyShops(options = {}) {
 
   loading.value = true;
   try {
+    const query = {
+      typeId: forms.typeId,
+      current: forms.current,
+    };
+    if (hasCoordinates.value) {
+      query.x = normalizeNumber(forms.x);
+      query.y = normalizeNumber(forms.y);
+    }
     const { data, success } = await shopApi.fetchByType(
-      {
-        typeId: forms.typeId,
-        current: forms.current,
-        x: normalizeNumber(forms.x),
-        y: normalizeNumber(forms.y),
-      },
+      query,
       options.notify ? { successMessage: "查询完成" } : { silentError: true },
     );
     if (success) {
@@ -157,21 +157,17 @@ function useCurrentLocation() {
   );
 }
 
-function clearCoordinates() {
+async function clearCoordinates() {
   forms.x = "";
   forms.y = "";
   forms.current = "1";
-  nearbyShops.value = [];
-  replaceQuery({ x: undefined, y: undefined, current: "1" });
+  await replaceQuery({ x: undefined, y: undefined, current: "1" });
+  await loadNearbyShops({ persist: false, notify: true });
 }
 
 function handleTypeChange() {
   forms.current = "1";
-  if (hasCoordinates.value) {
-    loadNearbyShops({ notify: true });
-    return;
-  }
-  replaceQuery({ current: "1" });
+  loadNearbyShops({ notify: true });
 }
 
 function changePage(page) {
@@ -191,7 +187,7 @@ function openShopDetail(shop) {
 onMounted(async () => {
   applyQueryState();
   await loadShopTypes();
-  if (hasCoordinates.value) {
+  if (forms.typeId) {
     await loadNearbyShops({ persist: false });
   }
 });
@@ -306,7 +302,7 @@ onMounted(async () => {
             :description="
               hasCoordinates
                 ? '暂无附近商铺数据'
-                : '输入坐标或使用当前位置后查询'
+                : '暂无该分类商铺数据'
             "
           />
         </template>

@@ -14,13 +14,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.Spy;
-import org.mockito.ArgumentMatchers;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResult;
 import org.springframework.data.geo.GeoResults;
+import org.springframework.data.geo.Metrics;
 import org.springframework.data.geo.Point;
 import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.GeoOperations;
@@ -41,6 +42,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -164,6 +166,52 @@ class ShopServiceImplTest {
     }
 
     @Test
+    void update_shouldMaintainGeoIndexWhenTypeOrCoordinatesChange() {
+        Shop update = shop(1L, "updated-shop")
+                .setTypeId(2L)
+                .setX(120.2)
+                .setY(30.2);
+        Shop oldShop = shop(1L, "old-shop")
+                .setTypeId(1L)
+                .setX(120.1)
+                .setY(30.1);
+        Shop newShop = shop(1L, "updated-shop")
+                .setTypeId(2L)
+                .setX(120.2)
+                .setY(30.2);
+        when(shopMapper.selectById(1L)).thenReturn(oldShop, newShop);
+        when(shopMapper.updateById(update)).thenReturn(1);
+        when(stringRedisTemplate.opsForGeo()).thenReturn(geoOperations);
+
+        Result result = shopService.update(update);
+
+        assertTrue(result.getSuccess());
+        verify(geoOperations).remove(SHOP_GEO_KEY + 1L, "1");
+        verify(geoOperations).add(eq(SHOP_GEO_KEY + 2L), any(Point.class), eq("1"));
+        verify(stringRedisTemplate).delete(RedisConstants.CACHE_SHOP_KEY + 1L);
+    }
+
+    @Test
+    void update_shouldNotTouchGeoIndexWhenGeoDataDoesNotChange() {
+        Shop update = shop(1L, "updated-shop")
+                .setTypeId(1L)
+                .setX(120.1)
+                .setY(30.1);
+        Shop persistedShop = shop(1L, "old-shop")
+                .setTypeId(1L)
+                .setX(120.1)
+                .setY(30.1);
+        when(shopMapper.selectById(1L)).thenReturn(persistedShop, persistedShop);
+        when(shopMapper.updateById(update)).thenReturn(1);
+
+        Result result = shopService.update(update);
+
+        assertTrue(result.getSuccess());
+        verify(stringRedisTemplate, never()).opsForGeo();
+        verify(stringRedisTemplate).delete(RedisConstants.CACHE_SHOP_KEY + 1L);
+    }
+
+    @Test
     void queryShopByType_shouldQueryDatabaseWhenCoordinatesAreMissing() {
         Shop shop = shop(1L, "type-shop");
         Page<Shop> page = new Page<>();
@@ -182,7 +230,7 @@ class ShopServiceImplTest {
         when(stringRedisTemplate.opsForGeo()).thenReturn(geoOperations);
         GeoResult<RedisGeoCommands.GeoLocation<String>> geoResult = new GeoResult<>(
                 new RedisGeoCommands.GeoLocation<>("5", new Point(121.1, 31.2)),
-                new Distance(123.4));
+                new Distance(0.1234, Metrics.KILOMETERS));
         when(geoOperations.search(eq(SHOP_GEO_KEY + 1), any(), any(Distance.class), any()))
                 .thenReturn(new GeoResults<>(List.of(geoResult)));
 
@@ -198,7 +246,34 @@ class ShopServiceImplTest {
         List<?> shops = (List<?>) result.getData();
         Shop first = (Shop) shops.get(0);
         assertEquals(5L, first.getId());
-        assertEquals(123.4, first.getDistance());
+        assertEquals(123.4, first.getDistance(), 0.0001);
+    }
+
+    @Test
+    void queryShopByType_shouldReturnEmptyListWhenGeoSearchReturnsNull() {
+        when(stringRedisTemplate.opsForGeo()).thenReturn(geoOperations);
+        when(geoOperations.search(eq(SHOP_GEO_KEY + 1), any(), any(Distance.class), any()))
+                .thenReturn(null);
+
+        Result result = shopService.queryShopByType(1, 1, 121.1, 31.2);
+
+        assertTrue(result.getSuccess());
+        assertEquals(List.of(), result.getData());
+    }
+
+    @Test
+    void queryShopByType_shouldReturnEmptyListWhenGeoPageIsOutOfRange() {
+        when(stringRedisTemplate.opsForGeo()).thenReturn(geoOperations);
+        GeoResult<RedisGeoCommands.GeoLocation<String>> geoResult = new GeoResult<>(
+                new RedisGeoCommands.GeoLocation<>("5", new Point(121.1, 31.2)),
+                new Distance(123.4));
+        when(geoOperations.search(eq(SHOP_GEO_KEY + 1), any(), any(Distance.class), any()))
+                .thenReturn(new GeoResults<>(List.of(geoResult)));
+
+        Result result = shopService.queryShopByType(1, 2, 121.1, 31.2);
+
+        assertTrue(result.getSuccess());
+        assertEquals(List.of(), result.getData());
     }
 
     private Shop shop(Long id, String name) {

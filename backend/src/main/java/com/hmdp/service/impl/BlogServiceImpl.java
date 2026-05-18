@@ -171,13 +171,18 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
                 os = 1;
             }
         }
-        // 根据 查询blog
+        // 根据 ID 查询 blog。Feed 中可能残留已删除笔记的 ID，回表后需要过滤空值。
         List<Blog> blogs = new ArrayList<>(ids.size());
         for (Long id : ids) {
             Blog blog = getById(id);
-            blogs.add(blog);
+            if (blog != null) {
+                blogs.add(blog);
+            }
         }
-        blogs.forEach(this::isBlogLiked);
+        blogs.forEach(blog -> {
+            queryBlogUser(blog);
+            isBlogLiked(blog);
+        });
         // 封装 返回
         ScrollResult scrollResult = new ScrollResult();
         scrollResult.setList(blogs);
@@ -189,6 +194,9 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     private void queryBlogUser(Blog blog) {
         Long userId = blog.getUserId();
         User user = userService.getById(userId);
+        if (user == null) {
+            return;
+        }
         blog.setName(user.getNickName());
         blog.setIcon(user.getIcon());
     }

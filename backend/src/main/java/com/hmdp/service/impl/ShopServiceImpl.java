@@ -15,6 +15,7 @@ import org.springframework.data.geo.Point;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResult;
 import org.springframework.data.geo.GeoResults;
+import org.springframework.data.geo.Metrics;
 import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.domain.geo.GeoReference;
@@ -29,6 +30,8 @@ import static com.hmdp.utils.RedisConstants.*;
 
 @Service
 public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IShopService {
+    private static final double SHOP_GEO_RADIUS_KM = 10;
+
     @Resource
     private StringRedisTemplate stringRedisTemplate;
     @Resource
@@ -95,10 +98,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             return Result.fail("创建商铺失败");
         }
 
-        stringRedisTemplate.opsForGeo().add(
-                SHOP_GEO_KEY + shop.getTypeId(),
-                new Point(shop.getX(), shop.getY()),
-                shop.getId().toString());
+        addShopToGeoIndex(shop);
 
         return Result.ok(getById(shop.getId()));
     }
@@ -111,8 +111,14 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         if (id == null) {
             return Result.fail("id不能为空");
         }
+        Shop oldShop = getById(id);
         // 更新数据库
-        updateById(shop);
+        boolean updated = updateById(shop);
+        if (!updated) {
+            return Result.fail("店铺不存在");
+        }
+        Shop newShop = getById(id);
+        syncGeoIndexAfterUpdate(oldShop, newShop);
         // 删除缓存
         stringRedisTemplate.delete(CACHE_SHOP_KEY + shop.getId());
         return Result.ok();
@@ -135,16 +141,16 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         // 查询redis 距离排序 分页
         String key = SHOP_GEO_KEY + typeId;
         GeoResults<RedisGeoCommands.GeoLocation<String>> results = stringRedisTemplate.opsForGeo()
-                .search(key, GeoReference.fromCoordinate(x, y), new Distance(5000),
+                .search(key, GeoReference.fromCoordinate(x, y), new Distance(SHOP_GEO_RADIUS_KM, Metrics.KILOMETERS),
                         RedisGeoCommands.GeoSearchCommandArgs.newGeoSearchArgs().includeDistance().limit(end));
         // 解析出id
         if (results == null) {
             return Result.ok(Collections.emptyList());
         }
         List<GeoResult<RedisGeoCommands.GeoLocation<String>>> content = results.getContent();
-        if (content.size() < from) {
+        if (content.size() <= from) {
             // 没有下一页
-            return Result.ok();
+            return Result.ok(Collections.emptyList());
         }
         // 截取
         List<Long> ids = new ArrayList<>(content.size());
@@ -157,13 +163,62 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             Distance distance = result.getDistance();
             distanceMap.put(shopId, distance);
         });
+        if (ids.isEmpty()) {
+            return Result.ok(Collections.emptyList());
+        }
         // 根据id查询shop
         String join = StrUtil.join(",", ids);
         List<Shop> shopList = lambdaQuery().in(Shop::getId, ids).last("order by field(id," + join + ")").list();
         for (Shop shop : shopList) {
-            shop.setDistance(distanceMap.get(shop.getId().toString()).getValue());
+            shop.setDistance(distanceMap.get(shop.getId().toString()).getValue() * 1000);
         }
         return Result.ok(shopList);
+    }
+
+    private void syncGeoIndexAfterUpdate(Shop oldShop, Shop newShop) {
+        if (newShop == null) {
+            if (oldShop != null) {
+                removeShopFromGeoIndex(oldShop);
+            }
+            return;
+        }
+        if (oldShop == null || isGeoIndexChanged(oldShop, newShop)) {
+            if (oldShop != null) {
+                removeShopFromGeoIndex(oldShop);
+            }
+            addShopToGeoIndex(newShop);
+        }
+    }
+
+    private boolean isGeoIndexChanged(Shop oldShop, Shop newShop) {
+        return !Objects.equals(oldShop.getTypeId(), newShop.getTypeId())
+                || !Objects.equals(oldShop.getX(), newShop.getX())
+                || !Objects.equals(oldShop.getY(), newShop.getY());
+    }
+
+    private void addShopToGeoIndex(Shop shop) {
+        if (!hasGeoIndexData(shop)) {
+            return;
+        }
+        stringRedisTemplate.opsForGeo().add(
+                SHOP_GEO_KEY + shop.getTypeId(),
+                new Point(shop.getX(), shop.getY()),
+                shop.getId().toString());
+    }
+
+    private void removeShopFromGeoIndex(Shop shop) {
+        if (shop == null || shop.getId() == null || shop.getTypeId() == null) {
+            return;
+        }
+        stringRedisTemplate.opsForGeo().remove(SHOP_GEO_KEY + shop.getTypeId(), shop.getId().toString());
+    }
+
+    private boolean hasGeoIndexData(Shop shop) {
+        return shop != null
+                && shop.getId() != null
+                && shop.getTypeId() != null
+                && shop.getX() != null
+                && shop.getY() != null;
     }
 
     private String normalize(String value) {

@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import com.hmdp.dto.LoginFormDTO;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
+import com.hmdp.dto.UserMeDTO;
 import com.hmdp.entity.User;
 import com.hmdp.entity.UserInfo;
 import com.hmdp.service.IUserInfoService;
@@ -60,8 +61,13 @@ public class UserController {
 
     @GetMapping("/me")
     public Result me() {
-        // 获取当前登录的用户并返回
-        return Result.ok(UserHolder.getUser());
+        UserDTO currentUser = UserHolder.getUser();
+        User user = userService.getById(currentUser.getId());
+        if (user == null) {
+            return Result.fail("用户不存在");
+        }
+        UserMeDTO userMeDTO = BeanUtil.copyProperties(user, UserMeDTO.class);
+        return Result.ok(userMeDTO);
     }
 
     @GetMapping("/info/{id}")

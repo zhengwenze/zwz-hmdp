@@ -7,6 +7,7 @@ import MePage from "../new_pages/MePage.vue";
 import ShopPage from "../new_pages/ShopPage.vue";
 import ShopDetailPage from "../new_pages/ShopDetailPage.vue";
 import BlogPage from "../new_pages/BlogPage.vue";
+import BlogDetailPage from "../new_pages/BlogDetailPage.vue";
 import FollowPage from "../new_pages/FollowPage.vue";
 import VoucherPage from "../new_pages/VoucherPage.vue";
 import ClaimVoucherPage from "../new_pages/ClaimVoucherPage.vue";
@@ -100,8 +101,19 @@ const routes = [
         component: BlogPage,
         meta: {
           title: "笔记管理",
-          description: "集中管理发布、热门、个人笔记和详情查询。",
+          description: "浏览社区笔记广场与关注流。",
           menu: true,
+        },
+      },
+      {
+        path: "blog/detail/:id",
+        name: "blog-detail",
+        component: BlogDetailPage,
+        meta: {
+          title: "笔记详情",
+          description: "查看笔记正文、作者信息和关联店铺。",
+          hidden: true,
+          activeMenu: "/blog",
         },
       },
       {
