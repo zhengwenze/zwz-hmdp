@@ -2,31 +2,11 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.hmdp.mapper.VoucherOrderMapper">
 
-  <select id="queryMyVouchers" resultType="com.hmdp.dto.MyVoucherDTO">
-    SELECT
-      o.`id` AS order_id,
-      o.`voucher_id`,
-      v.`shop_id`,
-      s.`name` AS shop_name,
-      v.`title`,
-      v.`sub_title`,
-      v.`rules`,
-      v.`pay_value`,
-      v.`actual_value`,
-      v.`type`,
-      sv.`stock`,
-      sv.`begin_time`,
-      sv.`end_time`,
-      o.`status` AS order_status,
-      o.`create_time`,
-      o.`pay_time`,
-      o.`use_time`,
-      o.`update_time`
-    FROM tb_voucher_order o
-    INNER JOIN tb_voucher v ON o.`voucher_id` = v.`id`
-    LEFT JOIN tb_shop s ON v.`shop_id` = s.`id`
-    LEFT JOIN tb_seckill_voucher sv ON v.`id` = sv.`voucher_id`
-    WHERE o.`user_id` = #{userId}
-    ORDER BY o.`create_time` DESC, o.`id` DESC
-  </select>
+  <select id="queryMyVouchers" resultType="com.hmdp.dto.MyVoucherDTO"> SELECT o.`id` AS order_id,
+    o.`voucher_id`, v.`shop_id`, s.`name` AS shop_name, v.`title`, v.`sub_title`, v.`rules`,
+    v.`pay_value`, v.`actual_value`, v.`type`, sv.`stock`, sv.`begin_time`, sv.`end_time`,
+    o.`status` AS order_status, o.`create_time`, o.`pay_time`, o.`use_time`, o.`update_time` FROM
+    tb_voucher_order o INNER JOIN tb_voucher v ON o.`voucher_id` = v.`id` LEFT JOIN tb_shop s ON
+    v.`shop_id` = s.`id` LEFT JOIN tb_seckill_voucher sv ON v.`id` = sv.`voucher_id` WHERE
+    o.`user_id` = #{userId} ORDER BY o.`create_time` DESC, o.`id` DESC </select>
 </mapper>
