@@ -31,6 +31,10 @@ import static com.hmdp.utils.RedisConstants.*;
 @Service
 public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IShopService {
     private static final double SHOP_GEO_RADIUS_KM = 10;
+    private static final double MIN_LONGITUDE = -180;
+    private static final double MAX_LONGITUDE = 180;
+    private static final double MIN_REDIS_LATITUDE = -85.05112878;
+    private static final double MAX_REDIS_LATITUDE = 85.05112878;
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
@@ -127,52 +131,108 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     // 3，按类型查询商店
     @Override
     public Result queryShopByType(Integer typeId, Integer current, Double x, Double y) {
-        // 判断是否需要坐标查询
-        if (x == null || y == null) {
-            // 不需要坐标查询
-            Page<Shop> page = lambdaQuery()
-                    .eq(Shop::getTypeId, typeId)
-                    .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
-            return Result.ok(page.getRecords());
+        Result validationResult = validateQueryByTypeParams(typeId, current, x, y);
+        if (validationResult != null) {
+            return validationResult;
         }
-        // 计算分页参数
-        int from = (current - 1) * SystemConstants.MAX_PAGE_SIZE;
-        int end = current * SystemConstants.MAX_PAGE_SIZE;
-        // 查询redis 距离排序 分页
+
+        if (!hasCoordinate(x, y)) {
+            return queryShopByTypeFromDb(typeId, current);
+        }
+        return queryShopByTypeWithGeo(typeId, current, x, y);
+    }
+
+    private Result validateQueryByTypeParams(Integer typeId, Integer current, Double x, Double y) {
+        if (typeId == null) {
+            return Result.fail("商铺类型不能为空");
+        }
+        if (current == null || current < 1) {
+            return Result.fail("页码必须大于0");
+        }
+        if ((x == null) != (y == null)) {
+            return Result.fail("经纬度必须同时传入");
+        }
+        if (hasCoordinate(x, y) && (!isValidLongitude(x) || !isValidLatitude(y))) {
+            return Result.fail("经纬度范围不合法");
+        }
+        return null;
+    }
+
+    private Result queryShopByTypeFromDb(Integer typeId, Integer current) {
+        Page<Shop> page = lambdaQuery()
+                .eq(Shop::getTypeId, typeId)
+                .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
+        return Result.ok(page.getRecords());
+    }
+
+    private Result queryShopByTypeWithGeo(Integer typeId, Integer current, Double x, Double y) {
+        int from = pageOffset(current);
+        int end = geoLimit(current);
+
         String key = SHOP_GEO_KEY + typeId;
         GeoResults<RedisGeoCommands.GeoLocation<String>> results = stringRedisTemplate.opsForGeo()
                 .search(key, GeoReference.fromCoordinate(x, y), new Distance(SHOP_GEO_RADIUS_KM, Metrics.KILOMETERS),
                         RedisGeoCommands.GeoSearchCommandArgs.newGeoSearchArgs().includeDistance().limit(end));
-        // 解析出id
         if (results == null) {
             return Result.ok(Collections.emptyList());
         }
+
         List<GeoResult<RedisGeoCommands.GeoLocation<String>>> content = results.getContent();
         if (content.size() <= from) {
-            // 没有下一页
             return Result.ok(Collections.emptyList());
         }
-        // 截取
-        List<Long> ids = new ArrayList<>(content.size());
-        Map<String, Distance> distanceMap = new HashMap<>();
-        content.stream().skip(from).forEach(result -> {
-            // 店铺id
+
+        List<Long> ids = new ArrayList<>(SystemConstants.MAX_PAGE_SIZE);
+        Map<Long, Distance> distanceMap = new HashMap<>();
+        content.stream().skip(from).limit(SystemConstants.MAX_PAGE_SIZE).forEach(result -> {
             String shopId = result.getContent().getName();
-            ids.add(Long.valueOf(shopId));
-            // 距离
-            Distance distance = result.getDistance();
-            distanceMap.put(shopId, distance);
+            Long id = Long.valueOf(shopId);
+            ids.add(id);
+            distanceMap.put(id, result.getDistance());
         });
         if (ids.isEmpty()) {
             return Result.ok(Collections.emptyList());
         }
-        // 根据id查询shop
-        String join = StrUtil.join(",", ids);
-        List<Shop> shopList = lambdaQuery().in(Shop::getId, ids).last("order by field(id," + join + ")").list();
+
+        List<Shop> shopList = listByIdsKeepGeoOrder(ids);
         for (Shop shop : shopList) {
-            shop.setDistance(distanceMap.get(shop.getId().toString()).getValue() * 1000);
+            Distance distance = distanceMap.get(shop.getId());
+            if (distance != null) {
+                shop.setDistance(distance.getValue() * 1000);
+            }
         }
         return Result.ok(shopList);
+    }
+
+    private int pageOffset(Integer current) {
+        return (current - 1) * SystemConstants.MAX_PAGE_SIZE;
+    }
+
+    private int geoLimit(Integer current) {
+        return current * SystemConstants.MAX_PAGE_SIZE;
+    }
+
+    private List<Shop> listByIdsKeepGeoOrder(List<Long> ids) {
+        String join = StrUtil.join(",", ids);
+        return lambdaQuery()
+                .in(Shop::getId, ids)
+                .last("order by field(id," + join + ")")
+                .list();
+    }
+
+    private boolean hasCoordinate(Double x, Double y) {
+        return x != null && y != null;
+    }
+
+    private boolean isValidLongitude(Double value) {
+        return value != null && Double.isFinite(value) && value >= MIN_LONGITUDE && value <= MAX_LONGITUDE;
+    }
+
+    private boolean isValidLatitude(Double value) {
+        return value != null
+                && Double.isFinite(value)
+                && value >= MIN_REDIS_LATITUDE
+                && value <= MAX_REDIS_LATITUDE;
     }
 
     private void syncGeoIndexAfterUpdate(Shop oldShop, Shop newShop) {
