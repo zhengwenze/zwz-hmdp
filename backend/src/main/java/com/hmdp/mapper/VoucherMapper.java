@@ -20,5 +20,7 @@ public interface VoucherMapper extends BaseMapper<Voucher> {
 
     List<Voucher> queryClaimableVouchers();
 
+    List<Voucher> queryClaimableVouchersWithShop();
+
     List<Long> queryExpiredSeckillVoucherIds();
 }

@@ -17,6 +17,14 @@
     AND sv.`begin_time` &lt;= NOW() AND sv.`end_time` &gt;= NOW() ) ) ORDER BY v.`type` DESC,
     v.`update_time` DESC, v.`id` DESC </select>
 
+  <select id="queryClaimableVouchersWithShop" resultType="com.hmdp.entity.Voucher"> SELECT v.`id`,
+    v.`shop_id`, s.`name` AS shopName, v.`title`, v.`sub_title`, v.`rules`, v.`pay_value`,
+    v.`actual_value`, v.`type`, sv.`stock`, sv.`begin_time`, sv.`end_time` FROM tb_voucher v LEFT
+    JOIN tb_shop s ON v.`shop_id` = s.`id` LEFT JOIN tb_seckill_voucher sv ON v.id = sv.voucher_id
+    WHERE v.status = 1 AND ( v.`type` = 0 OR ( v.`type` = 1 AND sv.`stock` > 0 AND sv.`begin_time`
+    &lt;= NOW() AND sv.`end_time` &gt;= NOW() ) ) ORDER BY v.`type` DESC, v.`update_time` DESC,
+    v.`id` DESC </select>
+
   <select id="queryExpiredSeckillVoucherIds" resultType="java.lang.Long"> SELECT v.`id` FROM
     tb_voucher v INNER JOIN tb_seckill_voucher sv ON v.`id` = sv.`voucher_id` WHERE v.`type` = 1 AND
     sv.`end_time` &lt; NOW() </select>

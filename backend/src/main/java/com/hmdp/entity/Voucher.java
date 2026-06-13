@@ -79,6 +79,12 @@ public class Voucher implements Serializable {
     private Integer stock;
 
     /**
+     * 店铺名称
+     */
+    @TableField(exist = false)
+    private String shopName;
+
+    /**
      * 生效时间
      */
     @TableField(exist = false)
