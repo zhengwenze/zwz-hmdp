@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import jakarta.annotation.Resource;
 import java.util.List;
 
-import static com.hmdp.utils.RedisConstants.SECKILL_STOCK_KEY;
+import com.hmdp.utils.RedisConstants;
 
 /**
  * <p>
@@ -112,7 +112,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
             throw new IllegalStateException("创建秒杀券库存记录失败");
         }
         // 保存秒杀库存到 Redis，失败时抛异常以回滚数据库事务。
-        stringRedisTemplate.opsForValue().set(SECKILL_STOCK_KEY + voucher.getId(), voucher.getStock().toString());
+        stringRedisTemplate.opsForHash().put(RedisConstants.SECKILL_KEY + voucher.getId(), "stock", voucher.getStock().toString());
         return Result.ok(voucher.getId());
     }
 
@@ -149,8 +149,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         seckillVoucherService.removeBatchByIds(expiredVoucherIds);
         removeBatchByIds(expiredVoucherIds);
         for (Long voucherId : expiredVoucherIds) {
-            stringRedisTemplate.delete(SECKILL_STOCK_KEY + voucherId);
-            stringRedisTemplate.delete("seckill:order:" + voucherId);
+            stringRedisTemplate.delete(RedisConstants.SECKILL_KEY + voucherId);
         }
     }
 }

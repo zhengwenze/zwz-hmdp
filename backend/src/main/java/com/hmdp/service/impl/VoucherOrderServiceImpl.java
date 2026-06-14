@@ -38,7 +38,7 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import static com.hmdp.utils.RedisConstants.SECKILL_STOCK_KEY;
+import static com.hmdp.utils.RedisConstants.SECKILL_KEY;
 
 @Service
 @Slf4j
@@ -491,8 +491,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                 new LambdaQueryWrapper<SeckillVoucher>()
                         .select(SeckillVoucher::getVoucherId, SeckillVoucher::getStock));
         for (SeckillVoucher voucher : vouchers) {
-            String stockKey = SECKILL_STOCK_KEY + voucher.getVoucherId();
-            Boolean initialized = stringRedisTemplate.opsForValue().setIfAbsent(stockKey,
+            String seckillKey = SECKILL_KEY + voucher.getVoucherId();
+            Boolean initialized = stringRedisTemplate.opsForHash().putIfAbsent(seckillKey, "stock",
                     String.valueOf(voucher.getStock()));
             if (Boolean.TRUE.equals(initialized)) {
                 log.info("Preloaded missing seckill stock cache: voucherId={}, stock={}",
@@ -516,8 +516,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         seckillVoucherService.removeBatchByIds(voucherIds);
         voucherMapper.deleteBatchIds(voucherIds);
         for (Long voucherId : voucherIds) {
-            stringRedisTemplate.delete(SECKILL_STOCK_KEY + voucherId);
-            stringRedisTemplate.delete("seckill:order:" + voucherId);
+            stringRedisTemplate.delete(SECKILL_KEY + voucherId);
         }
     }
 
