@@ -1,14 +1,9 @@
 
---//获取线程标识
---String threadId =ID_PREFIX+ Thread.currentThread().getId();
---//获取锁中标识
---String id = stringRedisTemplate.opsForValue().get(KET_PREFIX + name);
---//判断时候一致
---if (StringUtils.equals(id,threadId)){
---//一致 释放锁
---stringRedisTemplate.delete(KET_PREFIX + name);
---}
-if (redis.call('get',KEYS[1])==ARGV[1]) then
-    return redis.call('del',KEYS[1])
+-- KEYS[1]: 锁的key
+-- ARGV[1]: 线程标识
+-- 仅当锁属于当前线程时才释放，防止误删他人锁
+local lockValue = redis.call('GET', KEYS[1])
+if lockValue and lockValue == ARGV[1] then
+    return redis.call('DEL', KEYS[1])
 end
 return 0
